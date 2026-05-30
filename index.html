@@ -1,0 +1,161 @@
+<!DOCTYPE html>
+<html lang="ko">
+<head>
+  <meta charset="UTF-8" />
+  <meta name="viewport" content="width=device-width, initial-scale=1.0, viewport-fit=cover" />
+  <title>전통 사주 명리 분석</title>
+  <link rel="stylesheet" href="style.css?v=6" />
+  <link rel="manifest" href="manifest.json" />
+  <meta name="theme-color" content="#0b0c10" />
+  <meta name="apple-mobile-web-app-capable" content="yes" />
+  <meta name="apple-mobile-web-app-status-bar-style" content="black-translucent" />
+  <meta name="apple-mobile-web-app-title" content="사주명리" />
+  <link rel="apple-touch-icon" href="icon-192.png" />
+  <link href="https://fonts.googleapis.com/css2?family=Pretendard:wght@300;400;600;700&display=swap" rel="stylesheet">
+  <link rel="stylesheet" href="https://cdnjs.cloudflare.com/ajax/libs/font-awesome/6.4.0/css/all.min.css" />
+  <script src="https://cdnjs.cloudflare.com/ajax/libs/html2canvas/1.4.1/html2canvas.min.js"></script>
+</head>
+<body>
+  <div class="stars-bg"></div>
+  <main class="glass-container">
+    <header>
+      <h1>전통 사주 명리 분석</h1>
+      <p>자평명리(子平命理) 기반 · 명식 · 대운 · 세운 · 재물/직업/연애/건강운</p>
+    </header>
+
+    <!-- 입력 폼 -->
+    <form id="saju-form">
+      <div class="mode-toggle">
+        <label class="mode-opt"><input type="radio" name="mode" value="solo" checked><span>🧍 혼자 보기</span></label>
+        <label class="mode-opt"><input type="radio" name="mode" value="couple"><span>💕 궁합 보기</span></label>
+      </div>
+
+      <div class="person-block" id="person1">
+        <h3 class="person-title hidden">나의 정보</h3>
+        <div class="form-group grid-2">
+          <div class="input-wrapper">
+            <label for="birth-date">생년월일</label>
+            <input type="date" id="birth-date" required min="1900-01-01" max="2050-12-31" />
+          </div>
+          <div class="input-wrapper">
+            <label for="birth-hour">태어난 시간</label>
+            <div style="display: flex; gap: 0.5rem;">
+              <input type="number" id="birth-hour" min="0" max="23" placeholder="시(0~23)" autocomplete="off" />
+              <input type="number" id="birth-minute" min="0" max="59" placeholder="분" autocomplete="off" />
+            </div>
+            <label class="chk"><input type="checkbox" id="hour-unknown" /> 태어난 시간 모름</label>
+          </div>
+        </div>
+        <div class="form-group grid-2">
+          <div class="input-wrapper">
+            <label>역법 선택</label>
+            <div class="radio-row">
+              <label><input type="radio" name="calendarType" value="solar" checked> 양력</label>
+              <label><input type="radio" name="calendarType" value="lunar"> 음력</label>
+            </div>
+          </div>
+          <div class="input-wrapper hidden" id="leap-month-wrapper">
+            <label>윤달 여부</label>
+            <div class="radio-row">
+              <label><input type="radio" name="isLeap" value="false" checked> 평달</label>
+              <label><input type="radio" name="isLeap" value="true"> 윤달</label>
+            </div>
+          </div>
+        </div>
+        <div class="form-group">
+          <label>성별 <span class="hint">(대운 방향 계산에 필요)</span></label>
+          <div class="radio-row">
+            <label><input type="radio" name="gender" value="male" checked> 남성</label>
+            <label><input type="radio" name="gender" value="female"> 여성</label>
+          </div>
+        </div>
+      </div>
+
+      <div class="person-block hidden" id="person2">
+        <h3 class="person-title">💕 상대방 정보</h3>
+        <div class="form-group grid-2">
+          <div class="input-wrapper">
+            <label for="birth-date2">생년월일</label>
+            <input type="date" id="birth-date2" min="1900-01-01" max="2050-12-31" />
+          </div>
+          <div class="input-wrapper">
+            <label for="birth-hour2">태어난 시간</label>
+            <div style="display: flex; gap: 0.5rem;">
+              <input type="number" id="birth-hour2" min="0" max="23" placeholder="시(0~23)" autocomplete="off" />
+              <input type="number" id="birth-minute2" min="0" max="59" placeholder="분" autocomplete="off" />
+            </div>
+            <label class="chk"><input type="checkbox" id="hour-unknown2" /> 태어난 시간 모름</label>
+          </div>
+        </div>
+        <div class="form-group grid-2">
+          <div class="input-wrapper">
+            <label>역법 선택</label>
+            <div class="radio-row">
+              <label><input type="radio" name="calendarType2" value="solar" checked> 양력</label>
+              <label><input type="radio" name="calendarType2" value="lunar"> 음력</label>
+            </div>
+          </div>
+          <div class="input-wrapper hidden" id="leap-month-wrapper2">
+            <label>윤달 여부</label>
+            <div class="radio-row">
+              <label><input type="radio" name="isLeap2" value="false" checked> 평달</label>
+              <label><input type="radio" name="isLeap2" value="true"> 윤달</label>
+            </div>
+          </div>
+        </div>
+        <div class="form-group">
+          <label>성별</label>
+          <div class="radio-row">
+            <label><input type="radio" name="gender2" value="female" checked> 여성</label>
+            <label><input type="radio" name="gender2" value="male"> 남성</label>
+          </div>
+        </div>
+      </div>
+
+      <button type="submit" class="submit-btn">사주 분석하기 ✨</button>
+      <p class="form-note">※ 양력 1900~2050년 출생자만 계산됩니다. 출생 시각은 경도 기준 진태양시로 자동 보정됩니다.</p>
+    </form>
+
+    <!-- 1인 결과 -->
+    <section id="result-section" class="hidden">
+      <div id="result-head" class="result-head"></div>
+      <div id="today-banner"></div>
+
+      <nav class="tabs">
+        <button class="tab-btn active" data-tab="chart"><i class="fas fa-yin-yang"></i> 명식·종합</button>
+        <button class="tab-btn" data-tab="luck"><i class="fas fa-clover"></i> 재물·직업·연애·건강</button>
+        <button class="tab-btn" data-tab="time"><i class="fas fa-hourglass-half"></i> 과거·올해·미래</button>
+      </nav>
+
+      <div class="tab-panel" id="tab-chart"></div>
+      <div class="tab-panel hidden" id="tab-luck"></div>
+      <div class="tab-panel hidden" id="tab-time"></div>
+
+      <p class="disclaimer">본 분석은 전통 명리학(자평명리) 이론에 근거한 <b>참고용 해석</b>입니다. 사주명리는 통계적·과학적으로 증명된 학문이 아니며, 운명은 정해진 것이 아니라 개척하는 것입니다. (간명 원칙: 일간 중심 · 격국·억부·조후 통합 · 신살은 보조)</p>
+      <div class="result-btns">
+        <button class="submit-btn outline-btn" id="save-btn"><i class="fas fa-image"></i> 이미지로 저장</button>
+        <button class="submit-btn outline-btn" id="reset-btn">다시 입력하기 ↺</button>
+      </div>
+    </section>
+
+    <!-- 궁합 결과 -->
+    <section id="couple-result" class="hidden">
+      <div id="couple-head"></div>
+      <div id="couple-body"></div>
+      <p class="disclaimer">궁합 분석은 두 명식의 일간·배우자궁·오행·십성 관계를 종합한 <b>참고용 해석</b>입니다. 점수가 낮아도 노력과 이해로 충분히 좋은 관계를 만들 수 있으며, 점수가 높아도 서로의 노력이 있어야 합니다.</p>
+      <div class="result-btns">
+        <button class="submit-btn outline-btn" id="couple-save-btn"><i class="fas fa-image"></i> 이미지로 저장</button>
+        <button class="submit-btn outline-btn" id="couple-reset-btn">다시 입력하기 ↺</button>
+      </div>
+    </section>
+
+  </main>
+
+  <script type="module" src="app.js?v=6"></script>
+  <script>
+    if ('serviceWorker' in navigator) {
+      window.addEventListener('load', () => navigator.serviceWorker.register('service-worker.js').catch(() => {}));
+    }
+  </script>
+</body>
+</html>
