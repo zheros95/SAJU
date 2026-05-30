@@ -175,10 +175,10 @@ export function yongsin(pillars) {
     const bijeop = st.dist[dayElem], inseong = st.dist[inElem];
     if (inseong >= bijeop) {
       primary = wealthElem; helper = outElem;          // 인성과다 → 재성으로 인성 극
-      reason = '인성이 강해 신강하니, 재성(財)으로 인성을 덜고 식상으로 흐름을 틔웁니다';
+      reason = '나를 도와주는 기운이 넘쳐서 힘이 센 편이니, 그 힘을 재물·활동으로 풀어내는 것이 좋습니다';
     } else {
       primary = officerElem; helper = outElem;          // 비겁과다 → 관성으로 비겁 극
-      reason = '비겁이 강해 신강하니, 관성(官)으로 다스리고 식상(食傷)으로 기운을 설기합니다';
+      reason = '나와 같은 기운이 넘쳐서 힘이 센 편이니, 책임 있는 일과 재능을 펼치는 것으로 기운을 풀어내는 것이 좋습니다';
     }
   } else {
     // 무엇 때문에 신약인가: 식상/재성/관성 중 최대 세력
@@ -186,13 +186,13 @@ export function yongsin(pillars) {
     const maxDrain = Math.max(out, we, off);
     if (off === maxDrain && off > 0) {
       primary = inElem; helper = dayElem;               // 관살과다 → 인성(살인상생)
-      reason = '관성이 강해 신약하니, 인성(印)으로 살(殺)을 풀어 나를 돕습니다(살인상생)';
+      reason = '책임·압박의 기운이 강해 힘이 부치는 편이니, 배움과 윗사람의 도움으로 나를 받쳐주는 것이 좋습니다';
     } else if (we === maxDrain && we > 0) {
       primary = dayElem; helper = inElem;               // 재다신약 → 비겁
-      reason = '재성이 많아 신약하니(재다신약), 비겁(比劫)으로 재물을 감당할 힘을 키웁니다';
+      reason = '돈 들어올 자리는 많은데 감당할 힘이 부족한 편이니, 나와 같은 기운(자립심·협력자)으로 힘을 키우는 것이 좋습니다';
     } else {
       primary = inElem; helper = dayElem;               // 식상과다 → 인성
-      reason = '식상이 강해 신약하니, 인성(印)으로 기운이 새는 것을 막고 비겁으로 보탭니다';
+      reason = '재능을 쏟아내느라 기운이 새는 편이니, 배움과 휴식으로 채우고 나를 받쳐주는 것이 좋습니다';
     }
   }
 
@@ -488,20 +488,20 @@ export function compatibility(A, B) {
   // 1) 일간(나 자신) 오행 관계
   let stemRel, stemScore, stemDesc;
   if (ae === be) {
-    stemRel = '비화(比和)'; stemScore = 72;
-    stemDesc = '두 사람의 일간 오행이 같아 가치관과 기질이 비슷합니다. 친구처럼 편하지만, 닮은 만큼 경쟁·고집이 부딪힐 수 있습니다.';
+    stemRel = '비슷한 기질'; stemScore = 72;
+    stemDesc = '두 사람의 타고난 기운이 같아 가치관과 성향이 비슷합니다. 친구처럼 편하지만, 닮은 만큼 고집이 부딪힐 수 있습니다.';
   } else if (SHENG[be] === ae) {
-    stemRel = '상대가 나를 생(生)'; stemScore = 86;
-    stemDesc = '상대의 기운이 나를 북돋아 줍니다. 상대에게 받고 의지하게 되는, 편안하고 보살핌받는 인연입니다.';
+    stemRel = '상대가 나를 북돋아 줌'; stemScore = 86;
+    stemDesc = '상대의 기운이 나를 북돋아 줍니다. 상대에게 받고 기대게 되는, 편안하고 보살핌받는 인연입니다.';
   } else if (SHENG[ae] === be) {
-    stemRel = '내가 상대를 생(生)'; stemScore = 80;
-    stemDesc = '내 기운이 상대를 살려 줍니다. 내가 베풀고 이끄는 구도로, 헌신적이지만 한쪽으로 기울지 않게 균형이 필요합니다.';
+    stemRel = '내가 상대를 북돋아 줌'; stemScore = 80;
+    stemDesc = '내 기운이 상대를 살려 줍니다. 내가 베풀고 이끄는 사이로, 헌신적이지만 한쪽으로만 기울지 않게 균형이 필요합니다.';
   } else if (KE[be] === ae) {
-    stemRel = '상대가 나를 극(剋)'; stemScore = 56;
-    stemDesc = '상대에게 끌리면서도 긴장이 흐릅니다. 적당하면 자극과 발전이 되지만, 과하면 눌리는 느낌을 받습니다.';
+    stemRel = '상대가 나를 누르는 편'; stemScore = 56;
+    stemDesc = '상대에게 끌리면서도 약간의 긴장이 흐릅니다. 적당하면 좋은 자극이 되지만, 과하면 눌리는 느낌을 받을 수 있습니다.';
   } else {
-    stemRel = '내가 상대를 극(剋)'; stemScore = 58;
-    stemDesc = '내가 주도하는 구도입니다. 상대를 휘어잡되, 배려가 없으면 상대가 답답해할 수 있습니다.';
+    stemRel = '내가 상대를 이끄는 편'; stemScore = 58;
+    stemDesc = '내가 주도하는 사이입니다. 상대를 이끌되, 배려가 없으면 상대가 답답해할 수 있습니다.';
   }
 
   // 2) 일지(배우자궁) 합·충
@@ -512,17 +512,17 @@ export function compatibility(A, B) {
   const chung = Math.abs(_ai - _bi) === 6;
   let branchRel, branchScore, branchDesc;
   if (hap) {
-    branchRel = `일지 육합(${aB}${bB}→${hap})`; branchScore = 92;
-    branchDesc = '배우자궁(일지)이 서로 합을 이루는 천생연분형입니다. 함께 있으면 안정되고 끌어당기는 힘이 강합니다.';
+    branchRel = '마음 자리가 딱 맞음'; branchScore = 92;
+    branchDesc = '배우자 자리가 서로 착 맞아떨어지는 천생연분형입니다. 함께 있으면 안정되고 끌어당기는 힘이 강합니다.';
   } else if (chung) {
-    branchRel = `일지 충(${aB}${bB})`; branchScore = 42;
-    branchDesc = '배우자궁이 서로 충돌합니다. 강하게 끌리지만 부딪힘·변동이 잦으니, 서로의 공간을 존중하는 노력이 필요합니다.';
+    branchRel = '마음 자리가 부딪힘'; branchScore = 42;
+    branchDesc = '배우자 자리가 서로 부딪힙니다. 강하게 끌리지만 다툼·변동이 잦으니, 서로의 공간을 존중하는 노력이 필요합니다.';
   } else if (aB === bB) {
-    branchRel = '일지 동일'; branchScore = 72;
-    branchDesc = '배우자궁이 같아 생활 습관·코드가 잘 맞습니다.';
+    branchRel = '생활 코드가 같음'; branchScore = 72;
+    branchDesc = '배우자 자리가 같아 생활 습관·취향이 잘 맞습니다.';
   } else {
-    branchRel = '일지 평이'; branchScore = 64;
-    branchDesc = '배우자궁에 특별한 합·충이 없어 무난하고 담담한 관계입니다.';
+    branchRel = '무난함'; branchScore = 64;
+    branchDesc = '배우자 자리에 특별한 끌림이나 부딪힘이 없어, 무난하고 담담한 관계입니다.';
   }
 
   // 3) 오행 보완 (서로의 부족을 채워주는가)
@@ -543,9 +543,9 @@ export function compatibility(A, B) {
   const bSpouse = B.gender === 'male' ? '재성' : '관성';
   if (TENGOD_GROUP[aToB] === aSpouse && TENGOD_GROUP[bToA] === bSpouse) {
     spouseMatch = true;
-    spouseDesc = '서로가 서로에게 배우자성(정·편재 또는 정·편관)이 되는, 부부 인연이 깊은 조합입니다.';
+    spouseDesc = '서로가 서로에게 자연스러운 이성으로 작용하는, 부부 인연이 깊은 조합입니다.';
   } else if (TENGOD_GROUP[aToB] === aSpouse || TENGOD_GROUP[bToA] === bSpouse) {
-    spouseDesc = '한쪽에게 상대가 배우자성으로 작용해, 이성으로서의 끌림이 있는 인연입니다.';
+    spouseDesc = '한쪽에게 상대가 자연스러운 이성으로 작용해, 이성으로서의 끌림이 있는 인연입니다.';
   }
 
   const score = Math.round(stemScore * 0.32 + branchScore * 0.4 + complementScore * 0.28 + (spouseMatch ? 4 : 0));
