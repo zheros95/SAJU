@@ -9,39 +9,95 @@ const S_ELEM = { 甲: '목', 乙: '목', 丙: '화', 丁: '화', 戊: '토', 己
 const B_ELEM = { 子: '수', 丑: '토', 寅: '목', 卯: '목', 辰: '토', 巳: '화', 午: '화', 未: '토', 申: '금', 酉: '금', 戌: '토', 亥: '수' };
 const colorOf = ch => ELEM_COLOR[S_ELEM[ch] || B_ELEM[ch]] || '#fff';
 
-// ───────── 폼 토글 ─────────
+// ───────── 드롭다운(생년월일·시간) 채우기 ─────────
+const byId = (id) => document.getElementById(id);
+
+function setOptions(sel, opts) {
+  const prev = sel.value;
+  sel.innerHTML = opts.map(o =>
+    `<option value="${o.v}"${o.disabled ? ' disabled' : ''}${o.sel ? ' selected' : ''}>${o.t}</option>`).join('');
+  if (prev !== '' && opts.some(o => String(o.v) === prev)) sel.value = prev;
+}
+
+function hourLabel(h) {
+  if (h === 0) return '밤 12시 (자정)';
+  if (h === 12) return '낮 12시 (정오)';
+  if (h < 12) return `오전 ${h}시`;
+  return `오후 ${h - 12}시`;
+}
+
+function updateDays(sfx) {
+  const y = parseInt(byId('birth-year' + sfx).value, 10);
+  const m = parseInt(byId('birth-month' + sfx).value, 10);
+  const lunar = document.querySelector(`input[name="calendarType${sfx}"]:checked`).value === 'lunar';
+  let max = 31;
+  if (lunar) max = 30;                              // 음력은 한 달 최대 30일
+  else if (y && m) max = new Date(y, m, 0).getDate(); // 양력은 그 달의 실제 일수(윤년 반영)
+  const days = [{ v: '', t: '일', disabled: true, sel: true }];
+  for (let d = 1; d <= max; d++) days.push({ v: d, t: d + '일' });
+  setOptions(byId('birth-day' + sfx), days);
+}
+
+function updateMinuteState(sfx) {
+  byId('birth-minute' + sfx).disabled = byId('birth-hour' + sfx).value === '';
+}
+
+function populatePerson(sfx) {
+  const years = [{ v: '', t: '태어난 해', disabled: true, sel: true }];
+  const nowY = new Date().getFullYear();
+  for (let y = 1930; y <= nowY; y++) years.push({ v: y, t: y + '년' });
+  setOptions(byId('birth-year' + sfx), years);
+
+  const months = [{ v: '', t: '월', disabled: true, sel: true }];
+  for (let m = 1; m <= 12; m++) months.push({ v: m, t: m + '월' });
+  setOptions(byId('birth-month' + sfx), months);
+
+  const hours = [{ v: '', t: '시간 모름', sel: true }];
+  for (let h = 0; h < 24; h++) hours.push({ v: h, t: hourLabel(h) });
+  setOptions(byId('birth-hour' + sfx), hours);
+
+  const mins = [];
+  for (let m = 0; m < 60; m += 5) mins.push({ v: m, t: m + '분' });
+  setOptions(byId('birth-minute' + sfx), mins);
+
+  updateDays(sfx);
+  updateMinuteState(sfx);
+}
+
 ['', '2'].forEach(sfx => {
+  populatePerson(sfx);
   document.querySelectorAll(`input[name="calendarType${sfx}"]`).forEach(r =>
     r.addEventListener('change', function () {
-      document.getElementById('leap-month-wrapper' + sfx).classList.toggle('hidden', this.value !== 'lunar');
+      byId('leap-month-wrapper' + sfx).classList.toggle('hidden', this.value !== 'lunar');
+      updateDays(sfx);
     }));
-  document.getElementById('hour-unknown' + sfx).addEventListener('change', function () {
-    document.getElementById('birth-hour' + sfx).disabled = this.checked;
-    document.getElementById('birth-minute' + sfx).disabled = this.checked;
-  });
+  byId('birth-year' + sfx).addEventListener('change', () => updateDays(sfx));
+  byId('birth-month' + sfx).addEventListener('change', () => updateDays(sfx));
+  byId('birth-hour' + sfx).addEventListener('change', () => updateMinuteState(sfx));
 });
 
 // 혼자/궁합 모드 토글
 document.querySelectorAll('input[name="mode"]').forEach(r =>
   r.addEventListener('change', function () {
     const couple = this.value === 'couple';
-    document.getElementById('person2').classList.toggle('hidden', !couple);
+    byId('person2').classList.toggle('hidden', !couple);
     document.querySelector('#person1 .person-title').classList.toggle('hidden', !couple);
-    document.getElementById('birth-date2').required = couple;
   }));
 
 function readPerson(sfx) {
-  const ds = document.getElementById('birth-date' + sfx).value;
-  if (!ds) return null;
-  const [year, month, day] = ds.split('-').map(Number);
+  const year = parseInt(byId('birth-year' + sfx).value, 10);
+  const month = parseInt(byId('birth-month' + sfx).value, 10);
+  const day = parseInt(byId('birth-day' + sfx).value, 10);
+  if (!year || !month || !day) return null;
   if (year < 1900 || year > 2050) return { error: '1900~2050년 출생만 계산할 수 있습니다.' };
-  const hu = document.getElementById('hour-unknown' + sfx).checked;
-  const hour = hu ? 12 : (parseInt(document.getElementById('birth-hour' + sfx).value, 10) || 0);
-  const minute = hu ? 0 : (parseInt(document.getElementById('birth-minute' + sfx).value, 10) || 0);
+  const hv = byId('birth-hour' + sfx).value;
+  const hourUnknown = hv === '';
+  const hour = hourUnknown ? 12 : parseInt(hv, 10);
+  const minute = hourUnknown ? 0 : (parseInt(byId('birth-minute' + sfx).value, 10) || 0);
   const isLunar = document.querySelector(`input[name="calendarType${sfx}"]:checked`).value === 'lunar';
   const isLeap = document.querySelector(`input[name="isLeap${sfx}"]:checked`).value === 'true';
   const gender = document.querySelector(`input[name="gender${sfx}"]:checked`).value;
-  return { year, month, day, hour, minute, isLunar, isLeap, gender, hourUnknown: hu };
+  return { year, month, day, hour, minute, isLunar, isLeap, gender, hourUnknown };
 }
 
 // ───────── 제출 ─────────
