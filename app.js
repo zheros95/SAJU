@@ -105,13 +105,13 @@ document.getElementById('saju-form').addEventListener('submit', function (e) {
   e.preventDefault();
   const mode = document.querySelector('input[name="mode"]:checked').value;
   const p1 = readPerson('');
-  if (!p1) { alert('생년월일을 입력해 주세요.'); return; }
+  if (!p1) { alert('태어난 해 · 월 · 일을 모두 선택해 주세요.'); return; }
   if (p1.error) { alert(p1.error); return; }
 
   try {
     if (mode === 'couple') {
       const p2 = readPerson('2');
-      if (!p2) { alert('상대방 생년월일을 입력해 주세요.'); return; }
+      if (!p2) { alert('상대방의 태어난 해 · 월 · 일을 모두 선택해 주세요.'); return; }
       if (p2.error) { alert('상대방: ' + p2.error); return; }
       const A = buildChart(p1), B = buildChart(p2);
       A.input = p1; B.input = p2;
