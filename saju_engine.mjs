@@ -444,34 +444,48 @@ const JAHYEONG = ['辰', '午', '酉', '亥'];
 function hapElem(a, b) { return STEM_HAP_ELEM[a + b] || STEM_HAP_ELEM[b + a]; }
 function isChung(a, b) { return YUKCHUNG.some(([x, y]) => (a === x && b === y) || (a === y && b === x)); }
 
-export function computeRelations(pillars) {
+export function computeRelations(pillars, ys) {
   const stems = ['year', 'month', 'day', 'hour'].map(k => pillars[k][0]);
   const branches = ['year', 'month', 'day', 'hour'].map(k => pillars[k][1]);
+  const dayStem = pillars.day[0];
   const rel = [];
+
+  // 글자의 십성(일간 자신이면 '일간')과 용신 역할
+  const godS = (g) => g === dayStem ? '일간' : tenGodOfStem(dayStem, g);
+  const godB = (b) => tenGodOfBranch(dayStem, b);
+  const roleS = (g) => ys ? elemRole(STEM_ELEM[g], ys) : '';
+  const roleB = (b) => ys ? elemRole(BRANCH_ELEM[b], ys) : '';
+  const grpOf = (el) => ys ? godGroupOfElement(dayStem, el) : '';
 
   // 천간 합/충 (전체 쌍) — layer:'천간'(심리·생각), positions로 궁위 추적
   for (let i = 0; i < 4; i++) for (let j = i + 1; j < 4; j++) {
-    if (STEM_HAP[stems[i]] === stems[j])
-      rel.push({ kind: '합', type: '천간합', layer: '천간', glyphs: `${stems[i]}${stems[j]}`, where: `${POS[i]}·${POS[j]}`, positions: [i, j], result: hapElem(stems[i], stems[j]), good: true });
+    if (STEM_HAP[stems[i]] === stems[j]) {
+      const he = hapElem(stems[i], stems[j]);
+      rel.push({ kind: '합', type: '천간합', layer: '천간', glyphs: `${stems[i]}${stems[j]}`, where: `${POS[i]}·${POS[j]}`, positions: [i, j], result: he, good: true,
+        gods: [godS(stems[i]), godS(stems[j])], roles: [roleS(stems[i]), roleS(stems[j])], hapGroup: grpOf(he) });
+    }
     if (STEM_CHUNG[stems[i]] === stems[j])
-      rel.push({ kind: '충', type: '천간충', layer: '천간', glyphs: `${stems[i]}${stems[j]}`, where: `${POS[i]}·${POS[j]}`, positions: [i, j], good: false });
+      rel.push({ kind: '충', type: '천간충', layer: '천간', glyphs: `${stems[i]}${stems[j]}`, where: `${POS[i]}·${POS[j]}`, positions: [i, j], good: false,
+        gods: [godS(stems[i]), godS(stems[j])], roles: [roleS(stems[i]), roleS(stems[j])] });
   }
   // 지지 육합/육충 — layer:'지지'(현실·사건)
   for (let i = 0; i < 4; i++) for (let j = i + 1; j < 4; j++) {
     const a = branches[i], b = branches[j];
-    if (YUKHAP[a + b]) rel.push({ kind: '합', type: '육합', layer: '지지', glyphs: `${a}${b}`, where: `${POS[i]}·${POS[j]}`, positions: [i, j], result: YUKHAP[a + b], good: true });
-    if (isChung(a, b)) rel.push({ kind: '충', type: '지지충', layer: '지지', glyphs: `${a}${b}`, where: `${POS[i]}·${POS[j]}`, positions: [i, j], good: false });
+    if (YUKHAP[a + b]) rel.push({ kind: '합', type: '육합', layer: '지지', glyphs: `${a}${b}`, where: `${POS[i]}·${POS[j]}`, positions: [i, j], result: YUKHAP[a + b], good: true,
+      gods: [godB(a), godB(b)], roles: [roleB(a), roleB(b)], hapGroup: grpOf(YUKHAP[a + b]) });
+    if (isChung(a, b)) rel.push({ kind: '충', type: '지지충', layer: '지지', glyphs: `${a}${b}`, where: `${POS[i]}·${POS[j]}`, positions: [i, j], good: false,
+      gods: [godB(a), godB(b)], roles: [roleB(a), roleB(b)] });
   }
   // 삼합·반합 (왕지 포함 2개 = 반합)
   SAMHAP3.forEach(([a, b, c, el, wang]) => {
     const set = [a, b, c];
     const have = set.filter(x => branches.includes(x));
-    if (have.length === 3) rel.push({ kind: '합', type: '삼합', glyphs: `${a}${b}${c}`, where: '지지', result: el, good: true, strong: true });
-    else if (have.length === 2 && have.includes(wang)) rel.push({ kind: '합', type: '반합', glyphs: have.join(''), where: '지지', result: el, good: true });
+    if (have.length === 3) rel.push({ kind: '합', type: '삼합', glyphs: `${a}${b}${c}`, where: '지지', result: el, good: true, strong: true, hapGroup: grpOf(el) });
+    else if (have.length === 2 && have.includes(wang)) rel.push({ kind: '합', type: '반합', glyphs: have.join(''), where: '지지', result: el, good: true, hapGroup: grpOf(el) });
   });
   // 방합 (3개 완성만)
   BANGHAP.forEach(([a, b, c, el]) => {
-    if ([a, b, c].every(x => branches.includes(x))) rel.push({ kind: '합', type: '방합', glyphs: `${a}${b}${c}`, where: '지지', result: el, good: true, strong: true });
+    if ([a, b, c].every(x => branches.includes(x))) rel.push({ kind: '합', type: '방합', glyphs: `${a}${b}${c}`, where: '지지', result: el, good: true, strong: true, hapGroup: grpOf(el) });
   });
   // 삼형
   SAMHYEONG.forEach(([a, b, c, name]) => {
