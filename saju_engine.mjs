@@ -94,6 +94,13 @@ export function twelveStage(dayStem, branch) {
   return TWELVE[diff];
 }
 
+// 십이운성의 기세(강/중/약) — 그 글자에 힘이 실렸는지 판단
+export const STAGE_STRENGTH = {
+  장생: '강', 관대: '강', 건록: '강', 제왕: '강',
+  목욕: '중', 양: '중', 쇠: '중', 태: '중',
+  병: '약', 사: '약', 묘: '약', 절: '약',
+};
+
 // ───────────────────────── 60갑자 인덱스 ─────────────────────────
 export function ganzhiIndex(stem, branch) {
   // 천간(10)·지지(12)로 60갑자 인덱스 복원
@@ -422,18 +429,18 @@ export function computeRelations(pillars) {
   const branches = ['year', 'month', 'day', 'hour'].map(k => pillars[k][1]);
   const rel = [];
 
-  // 천간 합/충 (인접 쌍 위주, 전체 쌍)
+  // 천간 합/충 (전체 쌍) — layer:'천간'(심리·생각), positions로 궁위 추적
   for (let i = 0; i < 4; i++) for (let j = i + 1; j < 4; j++) {
     if (STEM_HAP[stems[i]] === stems[j])
-      rel.push({ kind: '합', type: '천간합', glyphs: `${stems[i]}${stems[j]}`, where: `${POS[i]}·${POS[j]}`, result: hapElem(stems[i], stems[j]), good: true });
+      rel.push({ kind: '합', type: '천간합', layer: '천간', glyphs: `${stems[i]}${stems[j]}`, where: `${POS[i]}·${POS[j]}`, positions: [i, j], result: hapElem(stems[i], stems[j]), good: true });
     if (STEM_CHUNG[stems[i]] === stems[j])
-      rel.push({ kind: '충', type: '천간충', glyphs: `${stems[i]}${stems[j]}`, where: `${POS[i]}·${POS[j]}`, good: false });
+      rel.push({ kind: '충', type: '천간충', layer: '천간', glyphs: `${stems[i]}${stems[j]}`, where: `${POS[i]}·${POS[j]}`, positions: [i, j], good: false });
   }
-  // 지지 육합/육충
+  // 지지 육합/육충 — layer:'지지'(현실·사건)
   for (let i = 0; i < 4; i++) for (let j = i + 1; j < 4; j++) {
     const a = branches[i], b = branches[j];
-    if (YUKHAP[a + b]) rel.push({ kind: '합', type: '육합', glyphs: `${a}${b}`, where: `${POS[i]}·${POS[j]}`, result: YUKHAP[a + b], good: true });
-    if (isChung(a, b)) rel.push({ kind: '충', type: '지지충', glyphs: `${a}${b}`, where: `${POS[i]}·${POS[j]}`, good: false });
+    if (YUKHAP[a + b]) rel.push({ kind: '합', type: '육합', layer: '지지', glyphs: `${a}${b}`, where: `${POS[i]}·${POS[j]}`, positions: [i, j], result: YUKHAP[a + b], good: true });
+    if (isChung(a, b)) rel.push({ kind: '충', type: '지지충', layer: '지지', glyphs: `${a}${b}`, where: `${POS[i]}·${POS[j]}`, positions: [i, j], good: false });
   }
   // 삼합·반합 (왕지 포함 2개 = 반합)
   SAMHAP3.forEach(([a, b, c, el, wang]) => {
@@ -590,6 +597,7 @@ export function buildChart({ year, month, day, hour, minute, isLunar, isLeap, ge
       stemGod: k === 'day' ? '일간(我)' : tenGodOfStem(dayStem, s),
       branchGod: tenGodOfBranch(dayStem, b),
       stage: twelveStage(dayStem, b),
+      stageLevel: STAGE_STRENGTH[twelveStage(dayStem, b)],
       hidden: HIDDEN_STEMS[b].map(([hs]) => hs),
     };
   });

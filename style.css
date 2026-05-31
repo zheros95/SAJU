@@ -405,7 +405,23 @@ h3.sub { font-size: .95rem; margin: 1.5rem 0 .8rem; opacity: .85; color: #fff; }
 .today-text p:last-child { margin-bottom: 0; }
 .today-text b { color: var(--gold-accent); }
 
+/* ───────── 명식 글자별 풀이 ───────── */
+.pr-list { display: flex; flex-direction: column; gap: .8rem; margin-top: 1rem; }
+.pr-block { background: rgba(255,255,255,.04); border: 1px solid var(--panel-border); border-radius: 10px; padding: .8rem .9rem; }
+.pr-head { display: flex; align-items: center; gap: .55rem; flex-wrap: wrap; margin-bottom: .35rem; }
+.pr-gz { font-size: 1.35rem; font-weight: 700; letter-spacing: .03em; }
+.pr-title { font-size: .9rem; font-weight: 600; color: #fff; }
+.pr-stage { font-size: .7rem; font-weight: 700; padding: .12rem .5rem; border-radius: 10px; margin-left: auto; }
+.lv-strong { background: rgba(76,175,80,.2); color: #7ed884; }
+.lv-mid { background: rgba(212,175,55,.18); color: var(--gold-accent); }
+.lv-weak { background: rgba(244,67,54,.18); color: #ef9a9a; }
+.pr-life { font-size: .74rem; opacity: .55; margin-bottom: .5rem; }
+.pr-block p { font-size: .86rem; line-height: 1.6; opacity: .92; margin-bottom: .4rem; color: #e6e6e6; }
+.pr-block p:last-child { margin-bottom: 0; }
+.pr-block b { color: var(--gold-accent); }
+
 /* ───────── 합·충·형 ───────── */
+.rel-tip { font-size: .76rem; opacity: .6; font-weight: 400; }
 .rel-list { display: flex; flex-direction: column; gap: .6rem; margin-top: 1rem; }
 .rel-chip { border-radius: 10px; padding: .6rem .85rem; border-left: 3px solid; background: rgba(255,255,255,.04); }
 .rel-hap { border-color: #7ed884; }

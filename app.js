@@ -1,6 +1,6 @@
-import { buildChart } from './saju_engine.mjs';
-import * as T from './saju_text.mjs';
-import { dayMasterDescriptions } from './saju_descriptions.mjs';
+import { buildChart } from './saju_engine.mjs?v=8';
+import * as T from './saju_text.mjs?v=8';
+import { dayMasterDescriptions } from './saju_descriptions.mjs?v=8';
 
 // ───────── 오행 색상 ─────────
 const ELEM_COLOR = { 목: '#5cc46a', 화: '#f0584b', 토: '#e0a93a', 금: '#e8ebef', 수: '#4aa3f0' };
@@ -300,7 +300,28 @@ function renderToday(c) {
 
 // ── 탭1: 명식·종합 ──
 function renderChartTab(c) {
-  return mingsikTable(c) + relationsCard(c) + ohaengCard(c) + summaryCard(c) + dayMasterCard(c) + sinsalCard(c);
+  return mingsikTable(c) + pillarCard(c) + relationsCard(c) + ohaengCard(c) + summaryCard(c) + dayMasterCard(c) + sinsalCard(c);
+}
+
+// 명식 글자별 풀이 (자리×십성×십이운성 강약)
+function pillarCard(c) {
+  const lvCls = { 강: 'lv-strong', 중: 'lv-mid', 약: 'lv-weak' };
+  const blocks = T.pillarReadings(c).map(pr => {
+    const p = c.pillarInfo[pr.key];
+    const lv = p.stageLevel;
+    return `<div class="pr-block">
+      <div class="pr-head">
+        <span class="pr-gz"><span style="color:${colorOf(pr.stem)}">${pr.stem}</span><span style="color:${colorOf(pr.branch)}">${pr.branch}</span></span>
+        <span class="pr-title">${pr.gung} · ${pr.label}</span>
+        <span class="pr-stage ${lvCls[lv]}">${p.stage}·${lv}</span>
+      </div>
+      <div class="pr-life">${pr.life}</div>
+      ${pr.lines.map(l => `<p>${l}</p>`).join('')}
+    </div>`;
+  }).join('');
+  return `<div class="card"><h2><i class="fas fa-list-ul"></i> 명식 글자별 풀이</h2>
+    <p class="mini-note">각 자리(궁위)가 맡는 인생 영역에, 어떤 기운(십성)이 얼마만큼의 힘(십이운성)으로 들어있는지 봅니다.</p>
+    <div class="pr-list">${blocks}</div></div>`;
 }
 
 function relationsCard(c) {

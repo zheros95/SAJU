@@ -3,7 +3,7 @@
 // 종합 / 재물·직업·연애·건강운 / 과거·올해·향후10년 / 오늘 / 합충형 / 궁합.
 // 말투: 정중한 존댓말 + 어려운 한자어는 쉬운 말로 풀고 용어는 괄호로만 보조.
 
-import { STEM_KO, BRANCH_KO, BRANCH_ANIMAL, ELEM_HANJA, STEM_ELEM, TENGOD_GROUP, compatibility } from './saju_engine.mjs';
+import { STEM_KO, BRANCH_KO, BRANCH_ANIMAL, ELEM_HANJA, STEM_ELEM, TENGOD_GROUP, compatibility } from './saju_engine.mjs?v=8';
 
 // 십성(10가지 기운)을 한 단어 쉬운 말로
 const GOD_EASY = {
@@ -59,6 +59,59 @@ export const STAGE_INFO = {
   제왕: '기운이 가장 강한 절정의 때', 쇠: '정점을 지나 안정과 내실을 다지는 때', 병: '활동력이 떨어져 재정비하는 때', 사: '기운이 가라앉아 조용한 때',
   묘: '갈무리하고 쉬어가는 때', 절: '한번 끊고 새로 준비하는 때', 태: '새 기운이 잉태되는 때', 양: '차근차근 자라나는 때',
 };
+
+// ───────────────────────── 궁위(자리)·육친(가족) ─────────────────────────
+// 네 기둥이 각각 맡는 인생 영역과 시기
+const GUNG = {
+  year: { name: '연주', label: '뿌리·집안 자리', life: '조상·부모 윗대와 어린 시절(0~20세 무렵), 타고난 환경과 사회적 뿌리' },
+  month: { name: '월주', label: '사회·부모 자리', life: '부모·형제와 한창때(20~40대), 직장과 사회활동의 핵심 무대' },
+  day: { name: '일주', label: '나·배우자 자리', life: '나 자신과 배우자, 가정, 인생의 중심(중년기)' },
+  hour: { name: '시주', label: '자식·말년 자리', life: '자식과 아랫사람, 노년기(60세~), 미래의 꿈과 결실' },
+};
+// 십성이 뜻하는 가족(성별에 따라 달라지는 것 위주)
+function familyOf(god, male) {
+  const m = {
+    비견: '형제·친구·동료', 겁재: '형제·경쟁자',
+    식신: male ? '아랫사람·제자' : '딸·자식', 상관: male ? '아랫사람·제자' : '자식',
+    편재: male ? '아버지·애인' : '아버지·재물', 정재: male ? '아내·재물' : '재물',
+    편관: male ? '자식' : '애인·남자친구', 정관: male ? '자식·직장' : '남편',
+    편인: '이모·계모(문서)', 정인: '어머니(문서·공부)',
+  };
+  return m[god] || '';
+}
+// 받침에 맞춰 조사 붙이기
+const hasJong = (s) => (s.charCodeAt(s.length - 1) - 0xac00) % 28 !== 0;
+const wa = (s) => s + (hasJong(s) ? '과' : '와');
+const ira = (s) => s + (hasJong(s) ? '이라' : '라');
+// 십이운성 강약을 한 줄로
+function stageSentence(stage, level) {
+  const lv = { 강: '힘이 꽉 실려 있어', 중: '힘이 보통이라', 약: '힘이 빠져 있어' }[level];
+  return `이 자리의 기운은 '${stage}' 단계로 ${lv}`;
+}
+
+// 명식 글자별 풀이 — 자리(궁위) × 십성 × 십이운성 강약을 겹쳐 본다
+export function pillarReadings(c) {
+  const male = c.gender === 'male';
+  const order = ['hour', 'day', 'month', 'year']; // 화면 순서: 시-일-월-연
+  return order.map(k => {
+    const p = c.pillarInfo[k], g = GUNG[k];
+    const lines = [];
+    if (k === 'day') {
+      // 일주: 천간=나, 지지=배우자궁
+      lines.push(`천간(겉으로 드러나는 나)은 <b>${p.stem}(${p.stemKo}${p.stemElem})</b> — 이 글자가 바로 '나 자신'입니다.`);
+      const bg = godEasy(p.branchGod);
+      lines.push(`지지(배우자·가정 자리)는 <b>${p.branch}(${p.branchKo})</b>, 기운은 <b>${bg}</b>${hasJong(bg) ? '이라' : '라'} 배우자는 「${TENGOD_INFO[p.branchGod]?.key || ''}」 사람과 인연이 깊습니다. ${stageSentence(p.stage, p.stageLevel)}, 가정운이 그만큼 ${p.stageLevel === '강' ? '단단합니다' : p.stageLevel === '약' ? '여리니 더 보살펴야 합니다' : '무난합니다'}.`);
+    } else {
+      const sg = godEasy(p.stemGod), bg = godEasy(p.branchGod);
+      lines.push(`천간(겉·심리)은 <b>${p.stem}(${p.stemKo}${p.stemElem})·${sg}</b> — ${TENGOD_INFO[p.stemGod]?.personality || ''} 가족으로는 ${wa(familyOf(p.stemGod, male))} 관련됩니다.`);
+      lines.push(`지지(속·현실)는 <b>${p.branch}(${p.branchKo})·${bg}</b>. ${stageSentence(p.stage, p.stageLevel)}, 이 자리가 뜻하는 ${shortLife(k)} 영역에 기운이 ${p.stageLevel === '강' ? '강하게 실립니다' : p.stageLevel === '약' ? '약하게 작용합니다' : '무난히 작용합니다'}.`);
+    }
+    return { key: k, gung: g.name, label: g.label, life: g.life, stem: p.stem, branch: p.branch, lines };
+  });
+}
+function shortLife(k) {
+  return { year: '집안·초년', month: '사회·직장', hour: '자식·말년' }[k] || '';
+}
 
 // 운에서 들어오는 기운의 테마(쉬운 말)
 export function godTheme(god) {
@@ -317,13 +370,32 @@ export function todayReading(c) {
 }
 
 // ───────────────────────── 글자끼리의 작용(합·충·형) ─────────────────────────
+// 자리(궁위)별로 충/변동이 어느 인생 영역에 영향 주는지
+const GUNG_FIELD = {
+  연주: '집안·조상·초년 시절', 월주: '직장·사회활동·부모',
+  일주: '나 자신·배우자·가정', 시주: '자식·아랫사람·말년',
+};
+// 충이 일어난 자리들 → 영향받는 영역 문장
+function chungField(positions) {
+  if (!positions) return '';
+  const POS = ['연주', '월주', '일주', '시주'];
+  const fields = positions.map(i => GUNG_FIELD[POS[i]]).filter(Boolean);
+  return fields.length ? ` 특히 <b>${fields.join('</b>·<b>')}</b> 영역에서 변화가 나타나기 쉽습니다.` : '';
+}
+function hapField(positions) {
+  if (!positions) return '';
+  const POS = ['연주', '월주', '일주', '시주'];
+  const fields = positions.map(i => GUNG_FIELD[POS[i]]).filter(Boolean);
+  return fields.length ? ` <b>${fields.join('</b>·<b>')}</b> 영역이 안정되고 인연이 깊어집니다.` : '';
+}
+
 function relDesc(r) {
-  if (r.type === '천간합') return `위쪽 두 글자가 서로 잘 맞아 <b>${r.result}(${ELEM_HANJA[r.result]})</b> 기운으로 뭉칩니다. 끌어당기고 묶이는 작용입니다.`;
-  if (r.type === '천간충') return `위쪽 두 글자가 정면으로 부딪칩니다. 그 자리와 관련된 일에 생각의 충돌이나 변화가 생깁니다.`;
-  if (r.type === '육합') return `아래 두 글자가 잘 어울려 <b>${r.result}(${ELEM_HANJA[r.result]})</b> 기운으로 뭉칩니다. 인연·협력·안정의 작용입니다.`;
-  if (r.type === '지지충') return `아래 두 글자가 부딪칩니다. 그 자리에 이동·이사·변화·갈등이 생기기 쉽습니다.`;
-  if (r.type === '삼합' || r.type === '방합') return `세 글자가 모여 강한 <b>${r.result}(${ELEM_HANJA[r.result]})</b> 기운 덩어리를 이룹니다. 그 기운이 사주의 중심축이 됩니다.`;
-  if (r.type === '반합') return `<b>${r.result}(${ELEM_HANJA[r.result]})</b> 기운으로 부분적으로 뭉칩니다. 그 기운이 어느 정도 힘을 받습니다.`;
+  if (r.type === '천간합') return `겉(생각·심리)에서 두 글자가 잘 맞아 <b>${r.result}(${ELEM_HANJA[r.result]})</b> 기운으로 뭉칩니다. 마음이 끌리고 묶이는 작용입니다.${hapField(r.positions)}`;
+  if (r.type === '천간충') return `겉(생각·심리)에서 두 글자가 정면으로 부딪쳐, 가치관 충돌이나 마음의 변화가 생깁니다.${chungField(r.positions)}`;
+  if (r.type === '육합') return `현실(사건·관계)에서 두 글자가 어울려 <b>${r.result}(${ELEM_HANJA[r.result]})</b> 기운으로 뭉칩니다. 인연·협력·안정의 작용입니다.${hapField(r.positions)}`;
+  if (r.type === '지지충') return `현실(사건)에서 두 글자가 부딪쳐 이동·이사·이직·갈등이 생기기 쉽습니다.${chungField(r.positions)}`;
+  if (r.type === '삼합' || r.type === '방합') return `세 글자가 모여 강한 <b>${r.result}(${ELEM_HANJA[r.result]})</b> 기운 덩어리를 이룹니다. 그 기운이 사주의 중심축이 되어 인생 전반에 크게 작용합니다.`;
+  if (r.type === '반합') return `<b>${r.result}(${ELEM_HANJA[r.result]})</b> 기운으로 부분적으로 뭉쳐, 그 기운이 어느 정도 힘을 받습니다.`;
   if (r.type === '삼형') return `글자끼리 강하게 부딪치는 긴장 관계입니다(형). 다툼·구설·송사가 따를 수 있지만, 법·의료·군경처럼 날카로움을 다루는 일에서는 오히려 강점이 됩니다.`;
   if (r.type === '상형') return `예의·관계에서 마찰이 생기기 쉬운 긴장(형)입니다.`;
   if (r.type === '자형') return `같은 글자가 겹쳐 스스로 갈등하기 쉬운 기운(형)입니다. 자기관리가 필요합니다.`;
@@ -345,6 +417,7 @@ export function relationsReading(c) {
   if (hap > chung + hyeong) head += '어울림이 많아 인연·협력의 기운이 강한 편입니다.';
   else if (chung + hyeong > hap) head += '부딪힘이 많아 변화가 잦고 역동적이며, 그만큼 단련을 통해 성장하는 구조입니다.';
   else head += '어울림과 부딪힘이 섞여, 만남과 헤어짐·안정과 변화가 교차합니다.';
+  head += ' <span class="rel-tip">(겉=천간은 생각·마음, 속=지지는 현실·사건을 뜻합니다.)</span>';
   lines.push(head);
   const items = rel.map(r => ({ kind: r.kind, type: r.type, glyphs: r.glyphs, where: r.where, good: r.good, strong: r.strong, desc: relDesc(r) }));
   return { lines, items };
