@@ -4,7 +4,7 @@
   <meta charset="UTF-8" />
   <meta name="viewport" content="width=device-width, initial-scale=1.0, viewport-fit=cover" />
   <title>전통 사주 명리 분석</title>
-  <link rel="stylesheet" href="style.css?v=6" />
+  <link rel="stylesheet" href="style.css?v=7" />
   <link rel="manifest" href="manifest.json" />
   <meta name="theme-color" content="#0b0c10" />
   <meta name="apple-mobile-web-app-capable" content="yes" />
@@ -32,18 +32,19 @@
 
       <div class="person-block" id="person1">
         <h3 class="person-title hidden">나의 정보</h3>
-        <div class="form-group grid-2">
-          <div class="input-wrapper">
-            <label for="birth-date">생년월일</label>
-            <input type="date" id="birth-date" required min="1900-01-01" max="2050-12-31" />
+        <div class="form-group">
+          <label>생년월일</label>
+          <div class="select-row">
+            <select id="birth-year" required></select>
+            <select id="birth-month" required></select>
+            <select id="birth-day" required></select>
           </div>
-          <div class="input-wrapper">
-            <label for="birth-hour">태어난 시간</label>
-            <div style="display: flex; gap: 0.5rem;">
-              <input type="number" id="birth-hour" min="0" max="23" placeholder="시(0~23)" autocomplete="off" />
-              <input type="number" id="birth-minute" min="0" max="59" placeholder="분" autocomplete="off" />
-            </div>
-            <label class="chk"><input type="checkbox" id="hour-unknown" /> 태어난 시간 모름</label>
+        </div>
+        <div class="form-group">
+          <label>태어난 시간 <span class="hint">(모르면 '시간 모름'으로 두세요)</span></label>
+          <div class="select-row">
+            <select id="birth-hour"></select>
+            <select id="birth-minute"></select>
           </div>
         </div>
         <div class="form-group grid-2">
@@ -73,18 +74,19 @@
 
       <div class="person-block hidden" id="person2">
         <h3 class="person-title">💕 상대방 정보</h3>
-        <div class="form-group grid-2">
-          <div class="input-wrapper">
-            <label for="birth-date2">생년월일</label>
-            <input type="date" id="birth-date2" min="1900-01-01" max="2050-12-31" />
+        <div class="form-group">
+          <label>생년월일</label>
+          <div class="select-row">
+            <select id="birth-year2"></select>
+            <select id="birth-month2"></select>
+            <select id="birth-day2"></select>
           </div>
-          <div class="input-wrapper">
-            <label for="birth-hour2">태어난 시간</label>
-            <div style="display: flex; gap: 0.5rem;">
-              <input type="number" id="birth-hour2" min="0" max="23" placeholder="시(0~23)" autocomplete="off" />
-              <input type="number" id="birth-minute2" min="0" max="59" placeholder="분" autocomplete="off" />
-            </div>
-            <label class="chk"><input type="checkbox" id="hour-unknown2" /> 태어난 시간 모름</label>
+        </div>
+        <div class="form-group">
+          <label>태어난 시간 <span class="hint">(모르면 '시간 모름'으로 두세요)</span></label>
+          <div class="select-row">
+            <select id="birth-hour2"></select>
+            <select id="birth-minute2"></select>
           </div>
         </div>
         <div class="form-group grid-2">
@@ -151,7 +153,7 @@
 
   </main>
 
-  <script type="module" src="app.js?v=6"></script>
+  <script type="module" src="app.js?v=7"></script>
   <script>
     if ('serviceWorker' in navigator) {
       window.addEventListener('load', () => navigator.serviceWorker.register('service-worker.js').catch(() => {}));

@@ -296,6 +296,11 @@ input:focus, select:focus {
 .fill.metal { background: var(--metal-color); box-shadow: 0 0 8px var(--metal-color); }
 .fill.water { background: var(--water-color); box-shadow: 0 0 8px var(--water-color); }
 
+/* ───────── 생년월일·시간 드롭다운 ───────── */
+.select-row { display: flex; gap: .5rem; }
+.select-row select { flex: 1; min-width: 0; padding-left: .6rem; padding-right: .3rem; cursor: pointer; }
+.select-row select:disabled { opacity: .4; }
+
 /* ───────── 폼 보강 ───────── */
 .radio-row { display: flex; gap: 1.2rem; margin-top: .5rem; flex-wrap: wrap; }
 .radio-row label { display: inline-flex; align-items: center; gap: .35rem; cursor: pointer; margin-bottom: 0; color: #fff; }
@@ -453,6 +458,8 @@ h3.sub { font-size: .95rem; margin: 1.5rem 0 .8rem; opacity: .85; color: #fff; }
   .card { padding: 1.2rem; }
   .today-card { flex-direction: column; text-align: center; gap: .6rem; }
   .result-btns { flex-direction: column; gap: 0; }
+  .select-row { gap: .35rem; }
+  .select-row select { padding-left: .4rem; padding-right: .1rem; }
   .cp-day { font-size: 1.4rem; }
   .cp-ming { font-size: .7rem; }
   .cp-score-num { font-size: 1.9rem; }
