@@ -1,6 +1,6 @@
-import { buildChart } from './saju_engine.mjs?v=8';
-import * as T from './saju_text.mjs?v=8';
-import { dayMasterDescriptions } from './saju_descriptions.mjs?v=8';
+import { buildChart } from './saju_engine.mjs?v=9';
+import * as T from './saju_text.mjs?v=9';
+import { dayMasterDescriptions } from './saju_descriptions.mjs?v=9';
 
 // ───────── 오행 색상 ─────────
 const ELEM_COLOR = { 목: '#5cc46a', 화: '#f0584b', 토: '#e0a93a', 금: '#e8ebef', 수: '#4aa3f0' };

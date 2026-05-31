@@ -3,7 +3,7 @@
 // 종합 / 재물·직업·연애·건강운 / 과거·올해·향후10년 / 오늘 / 합충형 / 궁합.
 // 말투: 정중한 존댓말 + 어려운 한자어는 쉬운 말로 풀고 용어는 괄호로만 보조.
 
-import { STEM_KO, BRANCH_KO, BRANCH_ANIMAL, ELEM_HANJA, STEM_ELEM, TENGOD_GROUP, compatibility } from './saju_engine.mjs?v=8';
+import { STEM_KO, BRANCH_KO, BRANCH_ANIMAL, ELEM_HANJA, STEM_ELEM, TENGOD_GROUP, compatibility } from './saju_engine.mjs?v=9';
 
 // 십성(10가지 기운)을 한 단어 쉬운 말로
 const GOD_EASY = {
@@ -389,13 +389,59 @@ function hapField(positions) {
   return fields.length ? ` <b>${fields.join('</b>·<b>')}</b> 영역이 안정되고 인연이 깊어집니다.` : '';
 }
 
+// 사길신(생해서 살림)·사흉신(극해서 다스림) — 자평진전 순용·역용
+const GOOD_GODS = ['정관', '정재', '편재', '정인', '식신'];
+const BAD_GODS = ['편관', '상관', '겁재', '편인'];
+// 십성이 관장하는 인생 영역(한 단어)
+const GOD_FIELD = { 비겁: '경쟁·동료', 식상: '재능·표현', 재성: '재물·이성', 관성: '직장·명예', 인성: '공부·문서' };
+const godField = (g) => GOD_FIELD[TENGOD_GROUP[g]] || '';
+
+const uniqGods = (r) => [...new Set((r.gods || []).filter(g => g && g !== '일간'))];
+const godWithField = (g) => `${godEasy(g)}(${godField(g)})`;
+
+// 합이 십성에 미치는 작용: 길신은 묶이고(아쉬움), 흉신은 순화(좋음) + 용신/기신 역할
+function hapGodEffect(r) {
+  const gods = uniqGods(r);
+  const roles = r.roles || [];
+  let s = '';
+  if (gods.length) {
+    const good = gods.filter(g => GOOD_GODS.includes(g));
+    const bad = gods.filter(g => BAD_GODS.includes(g));
+    const etc = gods.filter(g => !GOOD_GODS.includes(g) && !BAD_GODS.includes(g));
+    const segs = [];
+    if (good.length) segs.push(`<b>${good.map(godWithField).join('·')}</b>의 복이 한데 묶입니다`);
+    if (bad.length) segs.push(`<b>${bad.map(godEasy).join('·')}</b>의 거친 기운이 순해집니다`);
+    if (etc.length) segs.push(`<b>${etc.map(godEasy).join('·')}</b> 기운이 묶입니다`);
+    s += ' ' + segs.join('; ') + '.';
+  }
+  if (roles.includes('용신') || roles.includes('희신')) s += ' 나에게 도움 되는 기운이 묶여 있어, 그 복을 온전히 쓰려면 합을 풀어주는 운이 와야 시원하게 발현됩니다.';
+  else if (roles.includes('기신')) s += ' 마침 거슬리던 기운이 합으로 묶여(합거), 그 부담이 줄어드는 좋은 작용입니다.';
+  return s;
+}
+// 충이 십성에 미치는 작용: 그 영역이 흔들림 + 용신충(흉)/기신충(풀림)
+function chungGodEffect(r) {
+  const gods = uniqGods(r);
+  const roles = r.roles || [];
+  let s = '';
+  if (gods.length) s += ` <b>${gods.map(godWithField).join('·')}</b> 영역이 흔들려 변동이 생기기 쉽습니다.`;
+  if (roles.includes('용신') || roles.includes('희신')) s += ' 하필 도움 되는 기운이 충을 맞으니, 그 시기엔 더욱 신중해야 합니다.';
+  else if (roles.includes('기신')) s += ' 거슬리던 기운이 충으로 흔들려(충거), 오히려 묵은 문제가 풀리기도 합니다.';
+  return s;
+}
+
 function relDesc(r) {
-  if (r.type === '천간합') return `겉(생각·심리)에서 두 글자가 잘 맞아 <b>${r.result}(${ELEM_HANJA[r.result]})</b> 기운으로 뭉칩니다. 마음이 끌리고 묶이는 작용입니다.${hapField(r.positions)}`;
-  if (r.type === '천간충') return `겉(생각·심리)에서 두 글자가 정면으로 부딪쳐, 가치관 충돌이나 마음의 변화가 생깁니다.${chungField(r.positions)}`;
-  if (r.type === '육합') return `현실(사건·관계)에서 두 글자가 어울려 <b>${r.result}(${ELEM_HANJA[r.result]})</b> 기운으로 뭉칩니다. 인연·협력·안정의 작용입니다.${hapField(r.positions)}`;
-  if (r.type === '지지충') return `현실(사건)에서 두 글자가 부딪쳐 이동·이사·이직·갈등이 생기기 쉽습니다.${chungField(r.positions)}`;
-  if (r.type === '삼합' || r.type === '방합') return `세 글자가 모여 강한 <b>${r.result}(${ELEM_HANJA[r.result]})</b> 기운 덩어리를 이룹니다. 그 기운이 사주의 중심축이 되어 인생 전반에 크게 작용합니다.`;
-  if (r.type === '반합') return `<b>${r.result}(${ELEM_HANJA[r.result]})</b> 기운으로 부분적으로 뭉쳐, 그 기운이 어느 정도 힘을 받습니다.`;
+  if (r.type === '천간합') return `겉(생각·심리)에서 두 글자가 잘 맞아 <b>${r.result}(${ELEM_HANJA[r.result]})</b> 기운으로 뭉칩니다.${hapGodEffect(r)}${hapField(r.positions)}`;
+  if (r.type === '천간충') return `겉(생각·심리)에서 두 글자가 정면으로 부딪쳐 가치관 충돌이나 마음의 변화가 생깁니다.${chungGodEffect(r)}${chungField(r.positions)}`;
+  if (r.type === '육합') return `현실(사건·관계)에서 두 글자가 어울려 <b>${r.result}(${ELEM_HANJA[r.result]})</b> 기운으로 뭉칩니다.${hapGodEffect(r)}${hapField(r.positions)}`;
+  if (r.type === '지지충') return `현실(사건)에서 두 글자가 부딪쳐 이동·이사·이직 같은 변화가 생기기 쉽습니다.${chungGodEffect(r)}${chungField(r.positions)}`;
+  if (r.type === '삼합' || r.type === '방합') {
+    const grp = r.hapGroup ? ` 일간 기준 <b>${GRP_EASY[r.hapGroup]}</b> 기운이 크게 강해집니다.` : '';
+    return `세 글자가 모여 강한 <b>${r.result}(${ELEM_HANJA[r.result]})</b> 기운 덩어리를 이룹니다.${grp} 이 기운이 사주의 중심축이 되어 인생 전반에 크게 작용합니다.`;
+  }
+  if (r.type === '반합') {
+    const grp = r.hapGroup ? ` (일간 기준 <b>${GRP_EASY[r.hapGroup]}</b> 기운)` : '';
+    return `<b>${r.result}(${ELEM_HANJA[r.result]})</b> 기운으로 부분적으로 뭉쳐, 그 기운이 어느 정도 힘을 받습니다.${grp}`;
+  }
   if (r.type === '삼형') return `글자끼리 강하게 부딪치는 긴장 관계입니다(형). 다툼·구설·송사가 따를 수 있지만, 법·의료·군경처럼 날카로움을 다루는 일에서는 오히려 강점이 됩니다.`;
   if (r.type === '상형') return `예의·관계에서 마찰이 생기기 쉬운 긴장(형)입니다.`;
   if (r.type === '자형') return `같은 글자가 겹쳐 스스로 갈등하기 쉬운 기운(형)입니다. 자기관리가 필요합니다.`;

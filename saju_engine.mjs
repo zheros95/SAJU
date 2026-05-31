@@ -321,6 +321,26 @@ export function fortuneOfElement(elem, ys) {
   if (KE[elem] === ys.helper) return -1;      // 희신을 극함
   return 0;
 }
+
+// 오행이 일간 기준 어떤 십성그룹인지 (합화 결과 판정용)
+export function godGroupOfElement(dayStem, elem) {
+  const de = STEM_ELEM[dayStem];
+  if (elem === de) return '비겁';
+  if (SHENG[de] === elem) return '식상';   // 내가 생함
+  if (KE[de] === elem) return '재성';       // 내가 극함
+  if (KE[elem] === de) return '관성';       // 나를 극함
+  if (SHENG[elem] === de) return '인성';    // 나를 생함
+  return '';
+}
+
+// 오행이 용신 체계에서 맡는 역할(용신/희신/기신/구신/평)
+export function elemRole(elem, ys) {
+  if (elem === ys.primary) return '용신';
+  if (elem === ys.helper) return '희신';
+  if (KE[elem] === ys.primary) return '기신';   // 용신을 극함
+  if (KE[elem] === ys.helper) return '구신';    // 희신을 극함
+  return '';
+}
 // 간지(천간+지지)의 종합 길흉
 export function rateGanzhi(stem, branch, ys) {
   const sf = fortuneOfElement(STEM_ELEM[stem], ys);
@@ -626,7 +646,7 @@ export function buildChart({ year, month, day, hour, minute, isLunar, isLeap, ge
   // 현재 대운 인덱스
   daeun.currentIdx = daeun.list.findIndex(d => curAge >= d.age && curAge <= d.endAge);
 
-  const relations = computeRelations(pillars);
+  const relations = computeRelations(pillars, ys);
   const todayLuck = computeToday(pillars, ys, today);
 
   return {
