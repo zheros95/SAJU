@@ -4,7 +4,7 @@
   <meta charset="UTF-8" />
   <meta name="viewport" content="width=device-width, initial-scale=1.0, viewport-fit=cover" />
   <title>전통 사주 명리 분석</title>
-  <link rel="stylesheet" href="style.css?v=8" />
+  <link rel="stylesheet" href="style.css?v=9" />
   <link rel="manifest" href="manifest.json" />
   <meta name="theme-color" content="#0b0c10" />
   <meta name="apple-mobile-web-app-capable" content="yes" />
@@ -24,7 +24,19 @@
     </header>
 
     <!-- 입력 폼 -->
-    <form id="saju-form">
+    <form id="saju-form" novalidate>
+      <!-- 무엇을 볼까: 다중 선택 -->
+      <div class="form-group view-pick">
+        <label>무엇을 볼까? <span class="hint">(여러 개 선택 가능 · 2개 이상이면 통합 분석)</span></label>
+        <div class="pick-toggle">
+          <label class="pick-opt"><input type="checkbox" name="view" value="saju" checked><span>📜 전통사주</span></label>
+          <label class="pick-opt"><input type="checkbox" name="view" value="gwansang"><span>👁️ 관상</span></label>
+          <label class="pick-opt"><input type="checkbox" name="view" value="susang"><span>✋ 수상</span></label>
+        </div>
+      </div>
+
+      <!-- 사주 입력 영역 (전통사주 선택 시 표시) -->
+      <div id="saju-section">
       <div class="mode-toggle">
         <label class="mode-opt"><input type="radio" name="mode" value="solo" checked><span>🧍 혼자 보기</span></label>
         <label class="mode-opt"><input type="radio" name="mode" value="couple"><span>💕 궁합 보기</span></label>
@@ -113,9 +125,30 @@
           </div>
         </div>
       </div>
+      </div><!-- /#saju-section -->
 
-      <button type="submit" class="submit-btn">사주 분석하기 ✨</button>
-      <p class="form-note">※ 양력 1900~2050년 출생자만 계산됩니다. 출생 시각은 경도 기준 진태양시로 자동 보정됩니다.</p>
+      <!-- 관상: 얼굴 사진 -->
+      <div class="upload-block hidden" id="face-block">
+        <label>👁️ 관상 — 얼굴 사진 <span class="hint">(정면 · 밝은 곳 · 이마가 머리카락에 가리지 않게)</span></label>
+        <label class="uploader" id="face-uploader">
+          <input type="file" accept="image/*" id="face-file" hidden>
+          <div class="up-placeholder"><i class="fas fa-camera"></i><span>얼굴 사진 올리기</span></div>
+          <img class="up-preview hidden" id="face-preview" alt="얼굴 미리보기">
+        </label>
+      </div>
+
+      <!-- 수상: 손바닥 사진 -->
+      <div class="upload-block hidden" id="palm-block">
+        <label>✋ 수상 — 손바닥 사진 <span class="hint">(주로 쓰는 손 · 손금 잘 보이게 활짝 펴서)</span></label>
+        <label class="uploader" id="palm-uploader">
+          <input type="file" accept="image/*" id="palm-file" hidden>
+          <div class="up-placeholder"><i class="fas fa-hand"></i><span>손바닥 사진 올리기</span></div>
+          <img class="up-preview hidden" id="palm-preview" alt="손바닥 미리보기">
+        </label>
+      </div>
+
+      <button type="submit" class="submit-btn">분석하기 ✨</button>
+      <p class="form-note">※ 사주: 양력 1900~2050년 출생자만 계산(진태양시 자동 보정). 관상·수상은 사진을 브라우저에서만 처리하며 서버로 전송하지 않습니다.</p>
     </form>
 
     <!-- 1인 결과 -->
@@ -127,11 +160,17 @@
         <button class="tab-btn active" data-tab="chart"><i class="fas fa-yin-yang"></i> 명식·종합</button>
         <button class="tab-btn" data-tab="luck"><i class="fas fa-clover"></i> 재물·직업·연애·건강</button>
         <button class="tab-btn" data-tab="time"><i class="fas fa-hourglass-half"></i> 과거·올해·미래</button>
+        <button class="tab-btn hidden" data-tab="gwansang"><i class="fas fa-eye"></i> 관상</button>
+        <button class="tab-btn hidden" data-tab="susang"><i class="fas fa-hand"></i> 수상</button>
+        <button class="tab-btn hidden" data-tab="integration"><i class="fas fa-circle-nodes"></i> 통합</button>
       </nav>
 
       <div class="tab-panel" id="tab-chart"></div>
       <div class="tab-panel hidden" id="tab-luck"></div>
       <div class="tab-panel hidden" id="tab-time"></div>
+      <div class="tab-panel hidden" id="tab-gwansang"></div>
+      <div class="tab-panel hidden" id="tab-susang"></div>
+      <div class="tab-panel hidden" id="tab-integration"></div>
 
       <p class="disclaimer">본 분석은 전통 명리학(자평명리) 이론에 근거한 <b>참고용 해석</b>입니다. 사주명리는 통계적·과학적으로 증명된 학문이 아니며, 운명은 정해진 것이 아니라 개척하는 것입니다. (간명 원칙: 일간 중심 · 격국·억부·조후 통합 · 신살은 보조)</p>
       <div class="result-btns">
@@ -153,9 +192,10 @@
 
   </main>
 
-  <script type="module" src="app.js?v=9"></script>
+  <script type="module" src="app.js?v=10"></script>
   <script>
-    if ('serviceWorker' in navigator) {
+    // 로컬 개발(localhost)에선 서비스워커를 등록하지 않아 캐시 꼬임을 방지
+    if ('serviceWorker' in navigator && location.hostname !== 'localhost' && location.hostname !== '127.0.0.1') {
       window.addEventListener('load', () => navigator.serviceWorker.register('service-worker.js').catch(() => {}));
     }
   </script>

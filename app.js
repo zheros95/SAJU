@@ -1,6 +1,8 @@
 import { buildChart } from './saju_engine.mjs?v=9';
 import * as T from './saju_text.mjs?v=9';
 import { dayMasterDescriptions } from './saju_descriptions.mjs?v=9';
+import { PALM_QUESTIONS, readPalmistry, detectHandType } from './palmistry.mjs?v=1';
+import { readIntegration } from './integration.mjs?v=1';
 
 // ───────── 오행 색상 ─────────
 const ELEM_COLOR = { 목: '#5cc46a', 화: '#f0584b', 토: '#e0a93a', 금: '#e8ebef', 수: '#4aa3f0' };
@@ -84,6 +86,91 @@ document.querySelectorAll('input[name="mode"]').forEach(r =>
     document.querySelector('#person1 .person-title').classList.toggle('hidden', !couple);
   }));
 
+// ───────── 보기 선택(사주/관상/수상) ─────────
+function selectedViews() {
+  return [...document.querySelectorAll('input[name="view"]:checked')].map(c => c.value);
+}
+function syncViewSections() {
+  const v = selectedViews();
+  byId('saju-section').classList.toggle('hidden', !v.includes('saju'));
+  byId('face-block').classList.toggle('hidden', !v.includes('gwansang'));
+  byId('palm-block').classList.toggle('hidden', !v.includes('susang'));
+  if (v.includes('susang')) ensurePalmSurvey();
+}
+document.querySelectorAll('input[name="view"]').forEach(c => c.addEventListener('change', syncViewSections));
+syncViewSections();
+
+// ── 수상 손금 설문 폼 (손 사진 아래 자동 생성) ──
+let _palmSurveyReady = false;
+function ensurePalmSurvey() {
+  if (_palmSurveyReady) return;
+  const html = `<div class="palm-survey">
+    <p class="mini-note">손 모양은 사진에서 <b>자동 판별</b>돼. 손금·문양은 사진을 보며 골라줘 (모르겠으면 그대로 둬도 돼).</p>
+    <p id="hand-auto-status" class="hand-auto-status hidden"></p>
+    ${PALM_QUESTIONS.map(q => `
+      <div class="form-group palm-q">
+        <label>${q.label} ${q.hint ? `<span class="hint">${q.hint}</span>` : ''}</label>
+        <div class="radio-col">
+          ${q.options.map((o, i) => `<label class="palm-opt"><input type="radio" name="palm-${q.id}" value="${o.value}"${i === 0 ? ' checked' : ''}> ${o.label}</label>`).join('')}
+        </div>
+      </div>`).join('')}
+  </div>`;
+  byId('palm-block').insertAdjacentHTML('beforeend', html);
+  _palmSurveyReady = true;
+}
+function readPalmAnswers() {
+  const a = {};
+  PALM_QUESTIONS.forEach(q => {
+    const sel = document.querySelector(`input[name="palm-${q.id}"]:checked`);
+    if (sel) a[q.id] = sel.value;
+  });
+  return a;
+}
+
+// 사진 업로드 미리보기 (브라우저 내에서만 처리, 서버 전송 없음)
+const uploadedImages = {};
+function wireUploader(fileId, previewId, key) {
+  const file = byId(fileId), preview = byId(previewId);
+  file.addEventListener('change', () => {
+    const f = file.files[0];
+    if (!f) return;
+    uploadedImages[key] = f;
+    preview.src = URL.createObjectURL(f);
+    preview.classList.remove('hidden');
+    file.closest('.uploader').querySelector('.up-placeholder').classList.add('hidden');
+  });
+}
+wireUploader('face-file', 'face-preview', 'face');
+wireUploader('palm-file', 'palm-preview', 'palm');
+
+// 손 사진 올리면 손모양(4원소)을 MediaPipe로 자동 판별 → 설문 자동 선택
+const HAND_KO = { earth: '흙손', fire: '불손', air: '공기손', water: '물손' };
+function setHandAutoStatus(html) {
+  const el = byId('hand-auto-status');
+  if (el) { el.innerHTML = html; el.classList.remove('hidden'); }
+}
+byId('palm-file').addEventListener('change', () => {
+  ensurePalmSurvey();
+  setHandAutoStatus('🤖 손모양 자동 분석 중…');
+  (async () => {
+    const img = byId('palm-preview');
+    try {
+      if (!img.complete || !img.naturalWidth) await img.decode().catch(() => {});
+      const r = await detectHandType(img);
+      if (r && r.type) {
+        const radio = document.querySelector(`input[name="palm-handType"][value="${r.type}"]`);
+        if (radio) radio.checked = true;
+        setHandAutoStatus(`🤖 손모양 자동 판별: <b>${HAND_KO[r.type]}</b> — 다르면 아래에서 직접 고쳐줘`);
+      } else {
+        setHandAutoStatus('🖐 손을 또렷이 못 찾았어요. 손모양은 아래에서 직접 골라 주세요.');
+      }
+    } catch (e) {
+      console.error(e);
+      setHandAutoStatus('손모양 자동 판별은 건너뛰고, 아래에서 직접 골라 주세요.');
+    }
+  })();
+});
+
 function readPerson(sfx) {
   const year = parseInt(byId('birth-year' + sfx).value, 10);
   const month = parseInt(byId('birth-month' + sfx).value, 10);
@@ -101,29 +188,70 @@ function readPerson(sfx) {
 }
 
 // ───────── 제출 ─────────
-document.getElementById('saju-form').addEventListener('submit', function (e) {
+document.getElementById('saju-form').addEventListener('submit', async function (e) {
   e.preventDefault();
-  const mode = document.querySelector('input[name="mode"]:checked').value;
-  const p1 = readPerson('');
-  if (!p1) { alert('태어난 해 · 월 · 일을 모두 선택해 주세요.'); return; }
-  if (p1.error) { alert(p1.error); return; }
+  const views = selectedViews();
+  if (!views.length) { alert('무엇을 볼지 하나 이상 선택해 주세요.'); return; }
+  if (views.includes('gwansang') && !uploadedImages.face) { alert('관상을 보려면 얼굴 사진을 올려주세요.'); return; }
+  if (views.includes('susang') && !uploadedImages.palm) { alert('수상을 보려면 손바닥 사진을 올려주세요.'); return; }
+
+  const btn = e.target.querySelector('.submit-btn');
+  const origLabel = btn.innerHTML;
+  const setBusy = t => { btn.disabled = true; btn.innerHTML = `<i class="fas fa-spinner fa-spin"></i> ${t}`; };
+  const clearBusy = () => { btn.disabled = false; btn.innerHTML = origLabel; };
 
   try {
-    if (mode === 'couple') {
-      const p2 = readPerson('2');
-      if (!p2) { alert('상대방의 태어난 해 · 월 · 일을 모두 선택해 주세요.'); return; }
-      if (p2.error) { alert('상대방: ' + p2.error); return; }
-      const A = buildChart(p1), B = buildChart(p2);
-      A.input = p1; B.input = p2;
-      renderCouple(A, B);
-    } else {
-      const c = buildChart(p1);
-      c.input = p1;
-      renderAll(c);
+    const mode = document.querySelector('input[name="mode"]:checked').value;
+
+    // ── 사주 ──
+    let saju = null;
+    if (views.includes('saju')) {
+      const p1 = readPerson('');
+      if (!p1) { alert('태어난 해 · 월 · 일을 모두 선택해 주세요.'); return; }
+      if (p1.error) { alert(p1.error); return; }
+      // 궁합은 '전통사주만' 선택했을 때만 (관상·수상과 함께면 혼자보기로 처리)
+      if (mode === 'couple' && views.length === 1) {
+        const p2 = readPerson('2');
+        if (!p2) { alert('상대방의 태어난 해 · 월 · 일을 모두 선택해 주세요.'); return; }
+        if (p2.error) { alert('상대방: ' + p2.error); return; }
+        const A = buildChart(p1), B = buildChart(p2);
+        A.input = p1; B.input = p2;
+        renderCouple(A, B);
+        return;
+      }
+      saju = buildChart(p1);
+      saju.input = p1;
     }
+
+    // ── 관상 (face-api, 동적 로드) ──
+    let face = null;
+    if (views.includes('gwansang')) {
+      setBusy('관상 분석 중…');
+      const { detectFace, readPhysiognomy } = await import('./physiognomy.mjs?v=1');
+      const pts = await detectFace(byId('face-preview'));
+      if (!pts) { clearBusy(); alert('사진에서 얼굴을 찾지 못했어요. 정면·밝은 곳에서 찍은 얼굴 사진으로 다시 시도해 주세요.'); return; }
+      face = readPhysiognomy(pts);
+      if (!face.ok) { clearBusy(); alert(face.reason); return; }
+    }
+
+    // ── 수상 (손금 설문 기반) ──
+    let palm = null;
+    if (views.includes('susang')) {
+      palm = readPalmistry(readPalmAnswers());
+    }
+
+    // ── 통합 교차통변 (2가지 이상 선택 시) ──
+    let integration = null;
+    if ([saju, face, palm].filter(Boolean).length >= 2) {
+      integration = readIntegration({ saju, face, palm, sajuProfile: saju ? dayMasterDescriptions[saju.dayStem] : null });
+    }
+
+    clearBusy();
+    renderResults({ saju, face, palm, integration });
   } catch (err) {
     console.error(err);
-    alert('사주 계산에 실패했습니다. 입력값(특히 음력 날짜·윤달)을 확인해 주세요.');
+    clearBusy();
+    alert('분석 중 문제가 발생했습니다: ' + (err.message || err));
   }
 });
 
@@ -205,21 +333,108 @@ document.querySelectorAll('.tab-btn').forEach(btn =>
   }));
 
 // ───────── 렌더 ─────────
-function renderAll(c) {
+function setTabVisible(tab, on) {
+  document.querySelector(`.tab-btn[data-tab="${tab}"]`).classList.toggle('hidden', !on);
+}
+
+function renderResults({ saju, face, palm, integration }) {
   document.getElementById('saju-form').classList.add('hidden');
+  document.getElementById('couple-result').classList.add('hidden');
   document.getElementById('result-section').classList.remove('hidden');
 
-  renderHead(c);
-  renderToday(c);
-  document.getElementById('tab-chart').innerHTML = renderChartTab(c);
-  document.getElementById('tab-luck').innerHTML = renderLuckTab(c);
-  document.getElementById('tab-time').innerHTML = renderTimeTab(c);
+  // 헤더·오늘 배너는 사주가 있을 때만
+  byId('result-head').classList.toggle('hidden', !saju);
+  byId('today-banner').classList.toggle('hidden', !saju);
+  if (saju) { renderHead(saju); renderToday(saju); }
 
-  // 첫 탭 활성화
-  document.querySelector('.tab-btn[data-tab="chart"]').click();
-  // 게이지 애니메이션
+  // 사주 탭
+  setTabVisible('chart', !!saju);
+  setTabVisible('luck', !!saju);
+  setTabVisible('time', !!saju);
+  if (saju) {
+    byId('tab-chart').innerHTML = renderChartTab(saju);
+    byId('tab-luck').innerHTML = renderLuckTab(saju);
+    byId('tab-time').innerHTML = renderTimeTab(saju);
+  }
+
+  // 관상 탭
+  setTabVisible('gwansang', !!face);
+  if (face) byId('tab-gwansang').innerHTML = renderGwansangTab(face);
+
+  // 수상 탭
+  setTabVisible('susang', !!palm);
+  if (palm) byId('tab-susang').innerHTML = renderSusangTab(palm);
+
+  // 통합 탭
+  setTabVisible('integration', !!integration);
+  if (integration) byId('tab-integration').innerHTML = renderIntegrationTab(integration);
+
+  // 켜져 있는 첫 탭 활성화 (통합이 있으면 통합을 먼저 보여줌)
+  const first = ['integration', 'chart', 'gwansang', 'susang'].find(
+    t => !document.querySelector(`.tab-btn[data-tab="${t}"]`).classList.contains('hidden'));
+  if (first) document.querySelector(`.tab-btn[data-tab="${first}"]`).click();
+
   setTimeout(() => document.querySelectorAll('.gauge-fill,[data-w]').forEach(el => { el.style.width = el.dataset.w; }), 80);
   window.scrollTo({ top: 0, behavior: 'smooth' });
+}
+
+// ── 관상 탭 렌더 ──
+function renderGwansangTab(face) {
+  const head = `<div class="card">
+    <h2><i class="fas fa-eye"></i> 관상 종합</h2>
+    <div class="prose">${face.lines.map(l => `<p>${l}</p>`).join('')}</div>
+    <div class="badges">
+      <span class="badge good"><i class="fas fa-user-tag"></i> ${face.topType}</span>
+      <span class="badge"><i class="fas fa-circle-half-stroke"></i> 오행 ${face.element}</span>
+    </div>
+  </div>`;
+  const parts = `<div class="card">
+    <h2><i class="fas fa-list-ul"></i> 부위별 풀이</h2>
+    <p class="mini-note">face-api 얼굴 68점 자동 측정 기반 · 정면 사진일수록 정확합니다.</p>
+    <div class="sinsal-list">
+      ${face.items.map(it => `<div class="sinsal-chip"><b>${it.area}</b> <span>${it.cls}</span><p>${it.text}</p></div>`).join('')}
+    </div>
+  </div>`;
+  const disc = `<p class="disclaimer">관상은 통계적으로 검증된 학문이 아니며, '잘 맞는다'는 느낌의 정체는 <b>바넘효과·확증편향</b>입니다. 자기성찰용 참고로만 보고, 외모로 자신이나 타인을 단정하지 마세요. 얼굴은 표정·마음가짐·노력으로 바뀝니다.</p>`;
+  return head + parts + disc;
+}
+
+// ── 수상 탭 렌더 ──
+function renderSusangTab(palm) {
+  const head = `<div class="card">
+    <h2><i class="fas fa-hand"></i> 수상 종합</h2>
+    <div class="prose">${palm.lines.map(l => `<p>${l}</p>`).join('')}</div>
+    <div class="badges">
+      <span class="badge good"><i class="fas fa-hand-sparkles"></i> ${palm.topType}</span>
+      <span class="badge"><i class="fas fa-circle-half-stroke"></i> 오행 ${palm.element}</span>
+    </div>
+  </div>`;
+  const parts = `<div class="card">
+    <h2><i class="fas fa-list-ul"></i> 손금·손모양 풀이</h2>
+    <div class="sinsal-list">
+      ${palm.items.map(it => `<div class="sinsal-chip"><b>${it.area}</b> <span>${it.cls}</span><p>${it.text}</p></div>`).join('')}
+    </div>
+  </div>`;
+  const disc = `<p class="disclaimer">수상은 통계적으로 검증된 학문이 아니며, 손금은 노력·습관으로 변하는 신경학적 지표입니다. '잘 맞는다'는 느낌은 <b>바넘효과·확증편향</b>이니 자기성찰용 참고로만 보세요.</p>`;
+  return head + parts + disc;
+}
+
+// ── 통합 교차통변 탭 렌더 ──
+function renderIntegrationTab(intg) {
+  const chips = Object.entries(intg.els).map(([k, v]) =>
+    `<span class="badge"><i class="fas fa-circle-half-stroke"></i> ${k} ${v}</span>`).join('');
+  const head = `<div class="card integration-card">
+    <h2><i class="fas fa-circle-nodes"></i> 통합 사주 — 종합 통변</h2>
+    <p class="mini-note">전통 사주(命)를 중심에 두고 관상·수상을 오행으로 엮은 종합 인물평입니다.</p>
+    <div class="badges">${chips}</div>
+    <div class="prose">${intg.lines.map(l => `<p>${l}</p>`).join('')}</div>
+  </div>`;
+  const secs = (intg.sections || []).map(s => `<div class="card">
+    <h2><i class="fas ${s.icon}"></i> ${s.title}</h2>
+    <div class="prose"><p>${s.body}</p></div>
+  </div>`).join('');
+  const disc = `<p class="disclaimer">통합 해석은 사주(命)를 중심에 두고 관상·수상을 보조로 엮은 <b>참고용</b>입니다. 운명은 정해진 것이 아니라 개척하는 것이며, 관상·수상은 통계적으로 검증된 학문이 아닙니다.</p>`;
+  return head + secs + disc;
 }
 
 // ───────── 궁합 렌더 ─────────

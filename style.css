@@ -465,6 +465,39 @@ h3.sub { font-size: .95rem; margin: 1.5rem 0 .8rem; opacity: .85; color: #fff; }
 .cp-sec-body { font-size: .88rem; line-height: 1.6; opacity: .9; color: #e6e6e6; }
 .cp-sec-body b { color: var(--gold-accent); }
 
+/* ───────── 무엇을 볼까 토글 ───────── */
+.view-pick { margin-bottom: 1.6rem; }
+.pick-toggle { display: flex; gap: .5rem; }
+.pick-opt { flex: 1; margin-bottom: 0; }
+.pick-opt input { display: none; }
+.pick-opt span { display: block; text-align: center; padding: .75rem .3rem; border-radius: 9px; cursor: pointer; font-weight: 600; font-size: .85rem; color: var(--text-secondary); background: rgba(0,0,0,.25); border: 1px solid var(--panel-border); transition: all .2s; }
+.pick-opt input:checked + span { background: linear-gradient(135deg, var(--gold-accent), #b08d57); color: #1a1a2e; border-color: var(--gold-accent); }
+#saju-section { animation: fadeIn .4s ease; }
+
+/* ───────── 사진 업로드 ───────── */
+.upload-block { margin-bottom: 1.5rem; animation: fadeIn .4s ease; }
+.uploader { display: block; cursor: pointer; border: 1.5px dashed rgba(255,255,255,.25); border-radius: 12px; overflow: hidden; transition: all .2s; }
+.uploader:hover { border-color: var(--gold-accent); background: rgba(212,175,55,.04); }
+.up-placeholder { display: flex; flex-direction: column; align-items: center; justify-content: center; gap: .5rem; padding: 2.2rem 1rem; color: var(--text-secondary); }
+.up-placeholder i { font-size: 1.8rem; opacity: .6; }
+.up-placeholder span { font-size: .85rem; }
+.up-preview { width: 100%; max-height: 300px; object-fit: contain; display: block; background: #000; }
+
+/* ───────── 수상 손금 설문 ───────── */
+.palm-survey { margin-top: 1.3rem; padding-top: 1.3rem; border-top: 1px dashed var(--panel-border); display: flex; flex-direction: column; gap: 1.1rem; }
+.palm-q label { margin-bottom: .5rem; }
+.radio-col { display: flex; flex-direction: column; gap: .45rem; }
+.palm-opt { display: flex; align-items: center; gap: .5rem; padding: .55rem .8rem; border: 1px solid var(--panel-border); border-radius: 8px; cursor: pointer; font-size: .85rem; color: #ddd; margin-bottom: 0; transition: all .15s; }
+.palm-opt:hover { border-color: rgba(212,175,55,.5); }
+.palm-opt:has(input:checked) { border-color: var(--gold-accent); background: rgba(212,175,55,.1); color: #fff; }
+.palm-opt input { width: auto; flex: 0 0 auto; }
+.hand-auto-status { font-size: .83rem; color: var(--gold-accent); background: rgba(212,175,55,.1); border: 1px solid rgba(212,175,55,.35); border-radius: 8px; padding: .55rem .8rem; margin: 0; line-height: 1.5; }
+.hand-auto-status b { color: var(--gold-hover); }
+
+/* ───────── 통합 교차통변 ───────── */
+.integration-card { background: linear-gradient(135deg, rgba(212,175,55,.1), rgba(111,66,193,.12)); border-color: var(--gold-accent); }
+.integration-card .prose p { font-size: .95rem; }
+
 @media (max-width: 600px) {
   .glass-container { padding: 1.6rem 1.1rem; }
   .grid-2 { grid-template-columns: 1fr; }
