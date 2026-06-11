@@ -494,6 +494,16 @@ h3.sub { font-size: .95rem; margin: 1.5rem 0 .8rem; opacity: .85; color: #fff; }
 .hand-auto-status { font-size: .83rem; color: var(--gold-accent); background: rgba(212,175,55,.1); border: 1px solid rgba(212,175,55,.35); border-radius: 8px; padding: .55rem .8rem; margin: 0; line-height: 1.5; }
 .hand-auto-status b { color: var(--gold-hover); }
 
+/* ───────── 쉬운 풀이 (용어 옆 자동 부착) ───────── */
+.easy { font-size: .82em; color: #8fc7f2; opacity: .92; margin: 0 .1em 0 .18em; word-break: keep-all; font-weight: 400; }
+.prose b .easy, .luck-lines b .easy { font-weight: 400; }
+body.easy-off .easy { display: none; }
+.easy-bar { display: flex; justify-content: flex-end; margin-bottom: .7rem; }
+.easy-toggle { display: inline-flex; align-items: center; gap: .45rem; font-size: .82rem; color: var(--text-secondary); cursor: pointer; margin-bottom: 0; padding: .35rem .7rem; border: 1px solid var(--panel-border); border-radius: 18px; background: rgba(0,0,0,.2); }
+.easy-toggle input { width: auto; accent-color: #8fc7f2; }
+.easy-card { border-color: rgba(143,199,242,.55); background: linear-gradient(135deg, rgba(143,199,242,.08), rgba(212,175,55,.06)); }
+.easy-card h2::before { background: #8fc7f2; }
+
 /* ───────── 통합 교차통변 ───────── */
 .integration-card { background: linear-gradient(135deg, rgba(212,175,55,.1), rgba(111,66,193,.12)); border-color: var(--gold-accent); }
 .integration-card .prose p { font-size: .95rem; }

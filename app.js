@@ -3,6 +3,7 @@ import * as T from './saju_text.mjs?v=9';
 import { dayMasterDescriptions } from './saju_descriptions.mjs?v=9';
 import { PALM_QUESTIONS, readPalmistry, detectHandType } from './palmistry.mjs?v=1';
 import { readIntegration } from './integration.mjs?v=1';
+import { annotate, easySummaryCard } from './glossary.mjs?v=1';
 
 // ───────── 오행 색상 ─────────
 const ELEM_COLOR = { 목: '#5cc46a', 화: '#f0584b', 토: '#e0a93a', 금: '#e8ebef', 수: '#4aa3f0' };
@@ -324,6 +325,13 @@ document.getElementById('couple-save-btn').addEventListener('click', async () =>
   }
 });
 
+// 쉬운 풀이 토글 (양쪽 체크박스 동기화, 끄면 .easy 전체 숨김)
+document.querySelectorAll('.easy-toggle-input').forEach(cb =>
+  cb.addEventListener('change', function () {
+    document.querySelectorAll('.easy-toggle-input').forEach(o => { o.checked = this.checked; });
+    document.body.classList.toggle('easy-off', !this.checked);
+  }));
+
 // 탭 전환
 document.querySelectorAll('.tab-btn').forEach(btn =>
   btn.addEventListener('click', () => {
@@ -368,6 +376,10 @@ function renderResults({ saju, face, palm, integration }) {
   // 통합 탭
   setTabVisible('integration', !!integration);
   if (integration) byId('tab-integration').innerHTML = renderIntegrationTab(integration);
+
+  // 어려운 용어 옆에 쉬운 풀이 부착 (원문 유지)
+  ['today-banner', 'tab-chart', 'tab-luck', 'tab-time', 'tab-gwansang', 'tab-susang', 'tab-integration']
+    .forEach(id => annotate(byId(id)));
 
   // 켜져 있는 첫 탭 활성화 (통합이 있으면 통합을 먼저 보여줌)
   const first = ['integration', 'chart', 'gwansang', 'susang'].find(
@@ -478,6 +490,7 @@ function renderCouple(A, B) {
   document.getElementById('couple-body').innerHTML = `
     <div class="card"><div class="prose">${r.lines.map(l => `<p>${l}</p>`).join('')}</div></div>
     ${secCards}`;
+  annotate(document.getElementById('couple-body'));
 
   setTimeout(() => document.querySelectorAll('#couple-result [data-w]').forEach(el => { el.style.width = el.dataset.w; }), 80);
   window.scrollTo({ top: 0, behavior: 'smooth' });
@@ -515,7 +528,7 @@ function renderToday(c) {
 
 // ── 탭1: 명식·종합 ──
 function renderChartTab(c) {
-  return mingsikTable(c) + pillarCard(c) + relationsCard(c) + ohaengCard(c) + summaryCard(c) + dayMasterCard(c) + sinsalCard(c);
+  return easySummaryCard(c) + mingsikTable(c) + pillarCard(c) + relationsCard(c) + ohaengCard(c) + summaryCard(c) + dayMasterCard(c) + sinsalCard(c);
 }
 
 // 명식 글자별 풀이 (자리×십성×십이운성 강약)

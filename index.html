@@ -4,7 +4,7 @@
   <meta charset="UTF-8" />
   <meta name="viewport" content="width=device-width, initial-scale=1.0, viewport-fit=cover" />
   <title>전통 사주 명리 분석</title>
-  <link rel="stylesheet" href="style.css?v=9" />
+  <link rel="stylesheet" href="style.css?v=10" />
   <link rel="manifest" href="manifest.json" />
   <meta name="theme-color" content="#0b0c10" />
   <meta name="apple-mobile-web-app-capable" content="yes" />
@@ -156,6 +156,10 @@
       <div id="result-head" class="result-head"></div>
       <div id="today-banner"></div>
 
+      <div class="easy-bar">
+        <label class="easy-toggle"><input type="checkbox" class="easy-toggle-input" checked> 🔰 쉬운 풀이 함께 보기</label>
+      </div>
+
       <nav class="tabs">
         <button class="tab-btn active" data-tab="chart"><i class="fas fa-yin-yang"></i> 명식·종합</button>
         <button class="tab-btn" data-tab="luck"><i class="fas fa-clover"></i> 재물·직업·연애·건강</button>
@@ -182,6 +186,9 @@
     <!-- 궁합 결과 -->
     <section id="couple-result" class="hidden">
       <div id="couple-head"></div>
+      <div class="easy-bar">
+        <label class="easy-toggle"><input type="checkbox" class="easy-toggle-input" checked> 🔰 쉬운 풀이 함께 보기</label>
+      </div>
       <div id="couple-body"></div>
       <p class="disclaimer">궁합 분석은 두 명식의 일간·배우자궁·오행·십성 관계를 종합한 <b>참고용 해석</b>입니다. 점수가 낮아도 노력과 이해로 충분히 좋은 관계를 만들 수 있으며, 점수가 높아도 서로의 노력이 있어야 합니다.</p>
       <div class="result-btns">
@@ -192,7 +199,7 @@
 
   </main>
 
-  <script type="module" src="app.js?v=10"></script>
+  <script type="module" src="app.js?v=11"></script>
   <script>
     // 로컬 개발(localhost)에선 서비스워커를 등록하지 않아 캐시 꼬임을 방지
     if ('serviceWorker' in navigator && location.hostname !== 'localhost' && location.hostname !== '127.0.0.1') {
