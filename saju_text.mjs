@@ -3,7 +3,7 @@
 // 종합 / 재물·직업·연애·건강운 / 과거·올해·향후10년 / 오늘 / 합충형 / 궁합.
 // 말투: 정중한 존댓말 + 어려운 한자어는 쉬운 말로 풀고 용어는 괄호로만 보조.
 
-import { STEM_KO, BRANCH_KO, BRANCH_ANIMAL, ELEM_HANJA, STEM_ELEM, TENGOD_GROUP, compatibility } from './saju_engine.mjs?v=9';
+import { STEM_KO, BRANCH_KO, BRANCH_ANIMAL, ELEM_HANJA, STEM_ELEM, TENGOD_GROUP, compatibility, godGroupOfElement } from './saju_engine.mjs?v=10';
 
 // 십성(10가지 기운)을 한 단어 쉬운 말로
 const GOD_EASY = {
@@ -51,6 +51,7 @@ export const GYEOKGUK_INFO = {
   편인격: '남다른 감각과 순발력이 무기인 그릇입니다. 독창적 전문성이 강점입니다.',
   건록격: '스스로의 힘으로 일어서는 그릇입니다. 자수성가하며 실력으로 인정받습니다.',
   양인격: '기운이 강하고 밀어붙이는 힘이 센 그릇입니다. 기술·전문직에 어울립니다.',
+  월겁격: '내 기운과 동료의 기운이 강한 그릇입니다. 경쟁 속에서 스스로 일어서되, 동업·분배는 신중해야 합니다.',
 };
 
 // 십이운성 = 그 시기 '나의 기운 세기' 단계
@@ -190,7 +191,7 @@ export function wealthLuck(c) {
   if (ys.strong && g.재성 >= 1) { s += 10; lines.push('기운이 든든해서 돈을 감당할 그릇이 충분합니다. 적극적으로 재물을 추구해도 좋습니다.'); }
   if (!ys.strong && g.재성 >= 2) { s -= 12; lines.push('돈 들어올 자리는 많은데 그걸 감당할 내 힘이 부족한 편입니다. 욕심내기보다 건강과 협력자를 먼저 챙기세요.'); }
   if (g.비겁 >= 3) { s -= 8; lines.push('나와 비슷한 기운이 강해, 재물을 두고 경쟁·분배가 생기기 쉽습니다. 동업·보증·공동투자는 신중해야 합니다.'); }
-  if (ys.primary === '재성' || TENGOD_GROUP[c.gyeokguk.baseGod] === '재성') s += 6;
+  if (godGroupOfElement(c.dayStem, ys.primary) === '재성' || TENGOD_GROUP[c.gyeokguk.baseGod] === '재성') s += 6;
 
   if (c.godCount.편재 > c.godCount.정재 && c.godCount.편재 >= 1) lines.push('사업·투자처럼 크게 움직이는 돈(편재)에 인연이 있습니다.');
   else if (c.godCount.정재 >= 1) lines.push('월급·임대처럼 꾸준하고 안정적인 돈(정재)에 강합니다.');

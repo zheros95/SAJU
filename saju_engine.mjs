@@ -4,6 +4,7 @@
 // 참조: 옵시디언 wiki/사주 (음양오행·간지, 십성·십이운성, 용신·격국, 신살)
 
 import { calculateSaju, lunarToSolar } from './manseryeok.mjs';
+import { sajuYearMonth, daysToNearestTerm } from './solar_terms.mjs';
 
 // ───────────────────────── 기본 상수 ─────────────────────────
 export const STEMS = ['甲', '乙', '丙', '丁', '戊', '己', '庚', '辛', '壬', '癸'];
@@ -158,7 +159,8 @@ export function strength(pillars) {
   const wolryeong = monthElem === dayElem || monthElem === inElem;
 
   let level;
-  if (ratio >= 0.55) level = '신강';
+  if (ratio >= 0.72) level = '극신강';
+  else if (ratio >= 0.55) level = '신강';
   else if (ratio >= 0.42) level = wolryeong ? '신강' : '중화';
   else if (ratio >= 0.30) level = '신약';
   else level = '극신약';
@@ -175,17 +177,37 @@ export function yongsin(pillars) {
   const wealthElem = KE[dayElem];                            // 재성(내가 극)
   const officerElem = Object.keys(KE).find(k => KE[k] === dayElem); // 관성(나를 극)
 
+  // 조후 (한난조습) — 월지 계절로 한열을 조절. 분기들보다 먼저 계산해 둔다.
+  const monthB = pillars.month[1];
+  let johu = null, johuUrgent = false;
+  if (['亥', '子', '丑'].includes(monthB) && st.dist['화'] < 1.6) {       // 겨울 → 따뜻한 화 필요
+    johu = '화'; johuUrgent = (monthB === '子' || monthB === '丑');
+  } else if (['巳', '午', '未'].includes(monthB) && st.dist['수'] < 1.6) { // 여름 → 시원한 수 필요
+    johu = '수'; johuUrgent = (monthB === '午' || monthB === '未');
+  } else if (['寅', '卯'].includes(monthB) && st.dist['화'] < 0.6) {      // 초봄 한기 → 화
+    johu = '화';
+  } else if (['申', '酉'].includes(monthB) && st.dist['화'] < 0.6 && st.dist['수'] > 2) {
+    johu = '화';
+  }
+
   const strong = st.level === '신강' || st.level === '극신강';
-  let primary, helper, reason;
-  if (strong) {
+  let primary, helper, reason, method = '억부';
+  if (st.level === '중화') {
+    // 균형 사주 — 억부 처방 대신 조후·보완 위주
+    const weakest = ELEM_LIST.reduce((a, b) => (st.dist[a] <= st.dist[b] ? a : b));
+    primary = johu || weakest;
+    helper = Object.keys(SHENG).find(k => SHENG[k] === primary); // 용신을 생하는 오행
+    reason = '기운이 비교적 균형을 이루어 큰 결핍은 없습니다. 계절의 조화와 부족한 기운을 보충하는 운이 올 때 한층 순조롭습니다';
+    method = '중화 보완';
+  } else if (strong) {
     // 무엇 때문에 신강인가: 인성과다 vs 비겁과다
     const bijeop = st.dist[dayElem], inseong = st.dist[inElem];
     if (inseong >= bijeop) {
-      primary = wealthElem; helper = outElem;          // 인성과다 → 재성으로 인성 극
+      primary = wealthElem; helper = outElem;          // 인성과다 → 재성으로 인성 극, 식상이 재성을 생
       reason = '나를 도와주는 기운이 넘쳐서 힘이 센 편이니, 그 힘을 재물·활동으로 풀어내는 것이 좋습니다';
     } else {
-      primary = officerElem; helper = outElem;          // 비겁과다 → 관성으로 비겁 극
-      reason = '나와 같은 기운이 넘쳐서 힘이 센 편이니, 책임 있는 일과 재능을 펼치는 것으로 기운을 풀어내는 것이 좋습니다';
+      primary = officerElem; helper = wealthElem;       // 비겁과다 → 관성으로 비겁 극, 재성이 관성을 생(재생관)
+      reason = '나와 같은 기운이 넘쳐서 힘이 센 편이니, 책임 있는 일을 맡고 결실을 만들어 기운을 풀어내는 것이 좋습니다';
     }
   } else {
     // 무엇 때문에 신약인가: 식상/재성/관성 중 최대 세력
@@ -203,72 +225,51 @@ export function yongsin(pillars) {
     }
   }
 
-  // 조후 보정 (한난조습) — 월지 계절로 한열을 조절
-  const monthB = pillars.month[1];
-  let johu = null, johuUrgent = false;
-  if (['亥', '子', '丑'].includes(monthB) && st.dist['화'] < 1.6) {       // 겨울 → 따뜻한 화 필요
-    johu = '화'; johuUrgent = (monthB === '子' || monthB === '丑');
-  } else if (['巳', '午', '未'].includes(monthB) && st.dist['수'] < 1.6) { // 여름 → 시원한 수 필요
-    johu = '수'; johuUrgent = (monthB === '午' || monthB === '未');
-  } else if (['寅', '卯'].includes(monthB) && st.dist['화'] < 0.6) {      // 초봄 한기 → 화
-    johu = '화';
-  } else if (['申', '酉'].includes(monthB) && st.dist['화'] < 0.6 && st.dist['수'] > 2) {
-    johu = '화';
-  }
-  // 조후가 용신 체계와 어긋나지 않으면 희신으로 끌어올림
+  // 조후가 시급한데 용신 체계에 없으면 희신으로 끌어올림
   if (johuUrgent && johu && johu !== primary && johu !== helper) helper = johu;
 
-  return { primary, helper, johu, johuUrgent, reason, method: '억부', strong, level: st.level, detail: st };
+  return { primary, helper, johu, johuUrgent, reason, method, strong, level: st.level, detail: st };
 }
 
-// ───────────────────────── 격국(월지 기준 간이) ─────────────────────────
+// ───────────────────────── 격국(자평진전 간이 취격) ─────────────────────────
+const NOKJI = { 甲: '寅', 乙: '卯', 丙: '巳', 丁: '午', 戊: '巳', 己: '午', 庚: '申', 辛: '酉', 壬: '亥', 癸: '子' }; // 건록(록지)
+const WANGJI = { 甲: '卯', 丙: '午', 戊: '午', 庚: '酉', 壬: '子' }; // 양인(양간 왕지)
+
 export function gyeokguk(pillars) {
   const dayStem = pillars.day[0];
   const monthBranch = pillars.month[1];
   const mainGod = tenGodOfBranch(dayStem, monthBranch); // 월지 정기 십성
 
-  // 월지 지장간이 천간에 투출했는지(본기·중기·여기 순)
+  // 1) 월지가 일간의 록지/왕지면 투출과 무관하게 건록격/양인격 (비겁은 취격 대상이 아님)
+  if (NOKJI[dayStem] === monthBranch)
+    return { name: '건록격', baseGod: '비견', transparent: false, mainGod, monthBranch };
+  if (WANGJI[dayStem] === monthBranch)
+    return { name: '양인격', baseGod: '겁재', transparent: false, mainGod, monthBranch };
+
+  // 2) 월지 지장간 투출 검사 — 정기(본기)→중기→여기 순. 비겁 투출은 건너뜀
   const topStems = [pillars.year[0], pillars.month[0], pillars.hour[0]]; // 일간 제외
   let chosen = null, chosenStem = null;
-  for (const [hs] of HIDDEN_STEMS[monthBranch]) {
-    if (topStems.includes(hs) && hs !== dayStem) { chosen = tenGodOfStem(dayStem, hs); chosenStem = hs; break; }
+  for (const [hs] of [...HIDDEN_STEMS[monthBranch]].reverse()) {
+    if (hs === dayStem) continue;
+    const god = tenGodOfStem(dayStem, hs);
+    if (god === '비견' || god === '겁재') continue;
+    if (topStems.includes(hs)) { chosen = god; chosenStem = hs; break; }
   }
   const godForGyeok = chosen || mainGod;
 
-  // 비겁이면 건록/양인격
-  let name;
-  if (godForGyeok === '비견') name = '건록격';
-  else if (godForGyeok === '겁재') name = '양인격';
-  else name = godForGyeok + '격';
+  // 3) 투출 없이 월지 본기가 비겁이면(음간 겁재 본기 등) 월겁격
+  const name = (godForGyeok === '비견' || godForGyeok === '겁재') ? '월겁격' : godForGyeok + '격';
 
   return { name, baseGod: godForGyeok, transparent: !!chosen, mainGod, monthBranch };
 }
 
-// ───────────────────────── 절입일까지 일수(대운수) ─────────────────────────
-function daysToTerm(sy, sm, sd, forward) {
-  // 양력 기준. 월주(monthPillar)가 바뀌는 경계를 탐색
-  const base = calculateSaju(sy, sm, sd, 12, 0).monthPillarHanja;
-  const d = new Date(sy, sm - 1, sd);
-  const step = forward ? 1 : -1;
-  for (let i = 1; i <= 62; i++) {
-    d.setDate(d.getDate() + step);
-    const mp = calculateSaju(d.getFullYear(), d.getMonth() + 1, d.getDate(), 12, 0).monthPillarHanja;
-    if (mp !== base) {
-      // 순행: i일 뒤가 새 절기 → 일수 = i
-      // 역행: i일 전이 이전 절기 → 직전 절입일까지 = i - 1
-      return forward ? i : i - 1;
-    }
-  }
-  return 0;
-}
-
 // ───────────────────────── 대운 ─────────────────────────
-export function computeDaeun(solar, pillars, gender) {
-  // solar: {year, month, day}  (양력)
+export function computeDaeun(solar, pillars, gender, hh = 12, mi = 0) {
+  // solar: {year, month, day}  (양력) + 출생 시·분(절입시각 대비 정확한 대운수 계산)
   const yangYear = STEM_YY[pillars.year[0]] === '양';
   // 양남음녀 순행 / 음남양녀 역행
   const forward = (yangYear && gender === 'male') || (!yangYear && gender === 'female');
-  const days = daysToTerm(solar.year, solar.month, solar.day, forward);
+  const days = daysToNearestTerm(solar.year, solar.month, solar.day, hh, mi, forward);
   let startAge = Math.round(days / 3);
   if (startAge < 1) startAge = 1;
 
@@ -319,6 +320,11 @@ export function fortuneOfElement(elem, ys) {
   if (SHENG[elem] === ys.primary) return 1;   // 용신을 생함
   if (KE[elem] === ys.primary) return -2;     // 용신을 극함(기신)
   if (KE[elem] === ys.helper) return -1;      // 희신을 극함
+  // 신강 사주에서 일간을 더 부조하는 운(비겁·인성)은 흉 방향 — 억부 일관성
+  if (ys.strong && ys.detail) {
+    if (elem === ys.detail.dayElem) return -1.5;
+    if (elem === ys.detail.inElem) return -1;
+  }
   return 0;
 }
 
@@ -438,7 +444,7 @@ const YUKHAP = { 子丑: '토', 丑子: '토', 寅亥: '목', 亥寅: '목', 卯
 const YUKCHUNG = [['子', '午'], ['丑', '未'], ['寅', '申'], ['卯', '酉'], ['辰', '戌'], ['巳', '亥']];
 const SAMHAP3 = [['申', '子', '辰', '수', '子'], ['寅', '午', '戌', '화', '午'], ['巳', '酉', '丑', '금', '酉'], ['亥', '卯', '未', '목', '卯']];
 const BANGHAP = [['寅', '卯', '辰', '목'], ['巳', '午', '未', '화'], ['申', '酉', '戌', '금'], ['亥', '子', '丑', '수']];
-const SAMHYEONG = [['寅', '巳', '申', '지세지형(은혜를 잊는 형)'], ['丑', '戌', '未', '무은지형(세력을 믿는 형)']];
+const SAMHYEONG = [['寅', '巳', '申', '지세지형(세력을 믿는 형)'], ['丑', '戌', '未', '무은지형(은혜를 잊는 형)']];
 const JAHYEONG = ['辰', '午', '酉', '亥'];
 
 function hapElem(a, b) { return STEM_HAP_ELEM[a + b] || STEM_HAP_ELEM[b + a]; }
@@ -526,9 +532,12 @@ export function computeToday(pillars, ys, refDate) {
 export function compatibility(A, B) {
   const ae = STEM_ELEM[A.dayStem], be = STEM_ELEM[B.dayStem];
 
-  // 1) 일간(나 자신) 오행 관계
+  // 1) 일간(나 자신) 관계 — 천간합이 최우선(궁합 최길 지표)
   let stemRel, stemScore, stemDesc;
-  if (ae === be) {
+  if (STEM_HAP[A.dayStem] === B.dayStem) {
+    stemRel = '천간합 — 깊은 인연'; stemScore = 93;
+    stemDesc = '두 사람의 일간이 서로 끌어당겨 하나로 묶이는 천간합을 이룹니다. 궁합에서 가장 길하게 보는 조합으로, 자석처럼 끌리고 서로의 부족함을 채워 주는 인연입니다.';
+  } else if (ae === be) {
     stemRel = '비슷한 기질'; stemScore = 72;
     stemDesc = '두 사람의 타고난 기운이 같아 가치관과 성향이 비슷합니다. 친구처럼 편하지만, 닮은 만큼 고집이 부딪힐 수 있습니다.';
   } else if (SHENG[be] === ae) {
@@ -611,9 +620,19 @@ export function buildChart({ year, month, day, hour, minute, isLunar, isLeap, ge
   const mi = hourUnknown ? 0 : minute;
   const raw = calculateSaju(sy, sm, sd, h, mi);
 
+  // 년주·월주는 절입 '시각'(분 단위) 기준으로 재산출 — 라이브러리는 일 단위 경계라
+  // 절기 경계일 출생 사주가 틀어진다. 일주·시주는 라이브러리(진태양시 보정 포함)를 따른다.
+  const ym = sajuYearMonth(sy, sm, sd, h, mi);
+  const yStem = STEMS[((ym.sajuYear - 4) % 10 + 10) % 10];
+  const yBranch = BRANCHES[((ym.sajuYear - 4) % 12 + 12) % 12];
+  const inwolStemIdx = (STEMS.indexOf(yStem) % 5) * 2 + 2;   // 연두법: 그 해 寅월의 천간
+  const mOffset = (ym.monthBranchIdx - 2 + 12) % 12;          // 寅=0 … 丑=11
+  const mStem = STEMS[(inwolStemIdx + mOffset) % 10];
+  const mBranch = BRANCHES[ym.monthBranchIdx];
+
   const pillars = {
-    year: [raw.yearPillarHanja[0], raw.yearPillarHanja[1]],
-    month: [raw.monthPillarHanja[0], raw.monthPillarHanja[1]],
+    year: [yStem, yBranch],
+    month: [mStem, mBranch],
     day: [raw.dayPillarHanja[0], raw.dayPillarHanja[1]],
     hour: [raw.hourPillarHanja[0], raw.hourPillarHanja[1]],
   };
@@ -649,7 +668,7 @@ export function buildChart({ year, month, day, hour, minute, isLunar, isLeap, ge
   const ys = yongsin(pillars);
   const gg = gyeokguk(pillars);
   const sinsal = computeSinsal(pillars);
-  const daeun = computeDaeun(solar, pillars, gender);
+  const daeun = computeDaeun(solar, pillars, gender, h, mi);
   const today = new Date();
   const curAge = ageAt(solar, today);
   const seun = computeSeun(pillars, today.getFullYear(), 11);

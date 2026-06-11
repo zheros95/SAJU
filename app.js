@@ -1,9 +1,9 @@
-import { buildChart } from './saju_engine.mjs?v=9';
-import * as T from './saju_text.mjs?v=9';
-import { dayMasterDescriptions } from './saju_descriptions.mjs?v=9';
+import { buildChart } from './saju_engine.mjs?v=10';
+import * as T from './saju_text.mjs?v=10';
+import { dayMasterDescriptions } from './saju_descriptions.mjs?v=10';
 import { PALM_QUESTIONS, readPalmistry, detectHandType } from './palmistry.mjs?v=5';
 import { readIntegration } from './integration.mjs?v=1';
-import { annotate, easySummaryCard } from './glossary.mjs?v=1';
+import { annotate, easySummaryCard } from './glossary.mjs?v=2';
 
 // ───────── 오행 색상 ─────────
 const ELEM_COLOR = { 목: '#5cc46a', 화: '#f0584b', 토: '#e0a93a', 금: '#e8ebef', 수: '#4aa3f0' };

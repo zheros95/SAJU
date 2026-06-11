@@ -1,6 +1,6 @@
 // 오프라인 캐싱용 서비스 워커
 // 코드를 수정하면 CACHE 버전을 올려야 사용자에게 새 버전이 반영됩니다.
-const CACHE = 'saju-v8';
+const CACHE = 'saju-v9';
 const ASSETS = [
   './',
   './index.html',
@@ -10,6 +10,7 @@ const ASSETS = [
   './saju_text.mjs',
   './saju_descriptions.mjs',
   './manseryeok.mjs',
+  './solar_terms.mjs',
   './physiognomy.mjs',
   './palmistry.mjs',
   './integration.mjs',
