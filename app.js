@@ -1,7 +1,7 @@
 import { buildChart } from './saju_engine.mjs?v=9';
 import * as T from './saju_text.mjs?v=9';
 import { dayMasterDescriptions } from './saju_descriptions.mjs?v=9';
-import { PALM_QUESTIONS, readPalmistry, detectHandType } from './palmistry.mjs?v=1';
+import { PALM_QUESTIONS, readPalmistry, detectHandType } from './palmistry.mjs?v=5';
 import { readIntegration } from './integration.mjs?v=1';
 import { annotate, easySummaryCard } from './glossary.mjs?v=1';
 
@@ -156,12 +156,26 @@ byId('palm-file').addEventListener('change', () => {
   (async () => {
     const img = byId('palm-preview');
     try {
-      if (!img.complete || !img.naturalWidth) await img.decode().catch(() => {});
-      const r = await detectHandType(img);
+      // img.decode()는 간헐적으로 영원히 안 풀리는 버그가 있어 폴링으로 로드 대기
+      for (let i = 0; i < 50 && !(img.complete && img.naturalWidth); i++) {
+        await new Promise(res => setTimeout(res, 100));
+      }
+      if (!img.naturalWidth) throw new Error('이미지 로드 실패');
+      // 모델 로드가 막히면(느린 네트워크·GPU 문제) 20초 후 수동 선택으로 안내
+      const r = await Promise.race([
+        detectHandType(img),
+        new Promise((_, rej) => setTimeout(() => rej(new Error('hand-detect timeout')), 20000)),
+      ]);
       if (r && r.type) {
         const radio = document.querySelector(`input[name="palm-handType"][value="${r.type}"]`);
         if (radio) radio.checked = true;
-        setHandAutoStatus(`🤖 손모양 자동 판별: <b>${HAND_KO[r.type]}</b> — 다르면 아래에서 직접 고쳐줘`);
+        let sideTxt = '';
+        if (r.side) {
+          const sideRadio = document.querySelector(`input[name="palm-side"][value="${r.side}"]`);
+          if (sideRadio) sideRadio.checked = true;
+          sideTxt = `<b>${r.side === 'right' ? '오른손' : '왼손'}</b> · `;
+        }
+        setHandAutoStatus(`🤖 자동 인식: ${sideTxt}<b>${HAND_KO[r.type]}</b> — 다르면 아래에서 직접 고쳐줘`);
       } else {
         setHandAutoStatus('🖐 손을 또렷이 못 찾았어요. 손모양은 아래에서 직접 골라 주세요.');
       }

@@ -181,7 +181,10 @@ export function classifyHand(squareness, fingerRatio) {
   return { type, name: HAND[type].name, squareness: +squareness.toFixed(3), fingerRatio: +fingerRatio.toFixed(3) };
 }
 
-// 손 사진 → 손유형 (손을 못 찾으면 null)
+// 손 사진 → 손유형 + 좌우 판별 (손을 못 찾으면 null)
+// 좌우 판별: 손바닥이 보이는 사진 전제(수상은 손바닥만 봄).
+// 손목(0)→검지뿌리(5)와 손목(0)→소지뿌리(17) 벡터의 외적 부호는
+// 사진이 기울거나 뒤집혀도 변하지 않음 — 오른손바닥 양수, 왼손바닥 음수.
 export async function detectHandType(imgEl) {
   await loadHandModel();
   const res = _handLandmarker.detect(imgEl);
@@ -193,5 +196,14 @@ export async function detectHandType(imgEl) {
   const palmL = d(0, 9) || 1;  // 손목 → 중지 MCP
   const palmW = d(5, 17);      // 검지 MCP → 소지 MCP
   const fingerL = d(9, 12);    // 중지 MCP → 중지 끝
-  return classifyHand(palmW / palmL, fingerL / palmL);
+  const out = classifyHand(palmW / palmL, fingerL / palmL);
+  // 좌우 판별 (화면 좌표: x→오른쪽, y→아래)
+  const v1 = [lm[5].x - lm[0].x, lm[5].y - lm[0].y];
+  const v2 = [lm[17].x - lm[0].x, lm[17].y - lm[0].y];
+  const cross = v1[0] * v2[1] - v1[1] * v2[0];
+  out.side = cross > 0 ? 'right' : 'left';
+  // 참고용: MediaPipe 자체 판정(셀피 미러 기준이라 일반 사진은 반대로 줌)
+  const mp = res.handedness?.[0]?.[0] || res.handednesses?.[0]?.[0];
+  if (mp) out.mpLabel = mp.categoryName + ':' + Math.round((mp.score || 0) * 100);
+  return out;
 }
