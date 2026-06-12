@@ -109,7 +109,7 @@ function ensurePalmSurvey() {
     <p class="mini-note">손 모양은 사진에서 <b>자동 판별</b>돼. 손금·문양은 사진을 보며 골라줘 (모르겠으면 그대로 둬도 돼).</p>
     <p id="hand-auto-status" class="hand-auto-status hidden"></p>
     ${PALM_QUESTIONS.map(q => `
-      <div class="form-group palm-q">
+      <div class="form-group palm-q" data-qid="${q.id}">
         <label>${q.label} ${q.hint ? `<span class="hint">${q.hint}</span>` : ''}</label>
         <div class="radio-col">
           ${q.options.map((o, i) => `<label class="palm-opt"><input type="radio" name="palm-${q.id}" value="${o.value}"${i === 0 ? ' checked' : ''}> ${o.label}</label>`).join('')}
@@ -150,6 +150,12 @@ function setHandAutoStatus(html) {
   const el = byId('hand-auto-status');
   if (el) { el.innerHTML = html; el.classList.remove('hidden'); }
 }
+// 자동 인식되는 질문(좌우손·손모양) 표시/숨김
+function setAutoQuestionsHidden(hidden) {
+  ['side', 'handType'].forEach(qid => {
+    document.querySelector(`.palm-q[data-qid="${qid}"]`)?.classList.toggle('hidden', hidden);
+  });
+}
 byId('palm-file').addEventListener('change', () => {
   ensurePalmSurvey();
   setHandAutoStatus('🤖 손모양 자동 분석 중…');
@@ -175,9 +181,16 @@ byId('palm-file').addEventListener('change', () => {
           if (sideRadio) sideRadio.checked = true;
           sideTxt = `<b>${r.side === 'right' ? '오른손' : '왼손'}</b> · `;
         }
-        setHandAutoStatus(`🤖 자동 인식: ${sideTxt}<b>${HAND_KO[r.type]}</b> — 다르면 아래에서 직접 고쳐줘`);
+        // 자동 인식된 질문(좌우손·손모양)은 숨기고, 원하면 펼쳐서 고치게
+        setAutoQuestionsHidden(true);
+        setHandAutoStatus(`🤖 자동 인식: ${sideTxt}<b>${HAND_KO[r.type]}</b> <button type="button" class="edit-auto-btn" id="edit-auto-btn">직접 고치기</button>`);
+        byId('edit-auto-btn')?.addEventListener('click', () => {
+          setAutoQuestionsHidden(false);
+          byId('edit-auto-btn').remove();
+        });
       } else {
-        setHandAutoStatus('🖐 손을 또렷이 못 찾았어요. 손모양은 아래에서 직접 골라 주세요.');
+        setAutoQuestionsHidden(false);
+        setHandAutoStatus('🖐 손을 또렷이 못 찾았어요. 어느 손인지·손모양을 아래에서 직접 골라 주세요.');
       }
     } catch (e) {
       console.error(e);

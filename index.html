@@ -4,7 +4,7 @@
   <meta charset="UTF-8" />
   <meta name="viewport" content="width=device-width, initial-scale=1.0, viewport-fit=cover" />
   <title>전통 사주 명리 분석</title>
-  <link rel="stylesheet" href="style.css?v=10" />
+  <link rel="stylesheet" href="style.css?v=11" />
   <link rel="manifest" href="manifest.json" />
   <meta name="theme-color" content="#0b0c10" />
   <meta name="apple-mobile-web-app-capable" content="yes" />
@@ -168,6 +168,7 @@
         <button class="tab-btn hidden" data-tab="susang"><i class="fas fa-hand"></i> 수상</button>
         <button class="tab-btn hidden" data-tab="integration"><i class="fas fa-circle-nodes"></i> 통합</button>
       </nav>
+      <p class="tabs-hint">👆 위 버튼을 눌러 풀이를 골라 볼 수 있어요</p>
 
       <div class="tab-panel" id="tab-chart"></div>
       <div class="tab-panel hidden" id="tab-luck"></div>
@@ -199,7 +200,7 @@
 
   </main>
 
-  <script type="module" src="app.js?v=15"></script>
+  <script type="module" src="app.js?v=16"></script>
   <script>
     // 로컬 개발(localhost)에선 서비스워커를 등록하지 않아 캐시 꼬임을 방지
     if ('serviceWorker' in navigator && location.hostname !== 'localhost' && location.hostname !== '127.0.0.1') {
