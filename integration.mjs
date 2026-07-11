@@ -37,14 +37,14 @@ export function readIntegration({ saju, face, palm, sajuProfile }) {
   const els = {};
   let sajuEl = null, yong = null;
   if (saju) { sajuEl = dominantElement(saju); yong = saju.yongsin?.primary || null; if (sajuEl) els['사주'] = sajuEl; }
-  if (face) els['관상'] = face.element;
-  if (palm) els['수상'] = palm.element;
+  if (face && face.element) els['관상'] = face.element;
+  if (palm && palm.element) els['수상'] = palm.element; // 손모양 미판별 시 오행 교차 생략
 
   // ── 오행 관계 요약 (lines) ──
   const lines = [];
   const parts = Object.entries(els).map(([k, v]) => `${k} <b>${v}(${HANJA[v]})</b>`).join(' · ');
   if (parts) lines.push(`기운을 오행으로 모으면 — ${parts} — 입니다.`);
-  if (face && palm) {
+  if (face && face.element && palm && palm.element) {
     const f = face.element, p = palm.element;
     if (f === p) lines.push(`겉모습(관상)과 손(수상)이 모두 <b>${f}</b>${josaRo(f)} 일치해, 기질이 한 방향으로 또렷합니다.`);
     else if (SHENG[f] === p || SHENG[p] === f) lines.push(`관상 <b>${f}</b>${josaGwa(f)} 수상 <b>${p}</b>${josaIga(p)} <b>상생(相生)</b>이라 안팎이 자연스럽게 이어집니다.`);
@@ -91,21 +91,31 @@ export function readIntegration({ saju, face, palm, sajuProfile }) {
   const rels = [];
   if (sajuProfile?.relationship) rels.push(firstSent(sajuProfile.relationship));
   if (face?.profile) rels.push(face.profile.relation);
-  const relationText = rels.join(' ');
+  let relationText = rels.join(' ');
+
+  // 5.5) 손금 답변을 해당 주제에 반영 (손모양만 쓰던 것을 보완)
+  const pa = palm?.answers || {};
+  let strengthExtra = '', cautionExtra = '', aptExtra = '';
+  if (pa.fate === 'clear') aptExtra = ' 손금의 운명선도 뚜렷해, 한 방향으로 꾸준히 가면 성취가 분명한 편입니다.';
+  else if (pa.fate === 'none' || pa.fate === 'weak') aptExtra = ' 손금의 운명선은 흐릿한데, 전통 해석으로는 정해진 길보다 스스로 만들어 가는 쪽이 어울린다고 봅니다.';
+  if (pa.heart === 'curved') relationText += ' 손금의 감정선도 길게 휘어, 정이 많고 표현이 풍부한 결로 봅니다.';
+  else if (pa.heart === 'straight') relationText += ' 손금의 감정선은 곧아, 감정 표현을 절제하는 결로 봅니다.';
+  if (pa.sun === 'yes') strengthExtra = ' 약지 아래 태양선(명예·인기)이 있어 성취의 기운을 보탭니다.';
+  if (pa.simian === 'yes') cautionExtra = ' 막쥔손금의 강한 집중력은 큰 무기지만 극단으로 흐를 수 있으니 독주를 경계하세요.';
 
   // 6) 개운 조언
   const advices = [];
-  if (yong) advices.push(`사주에 부족한 <b>${yong}(${HANJA[yong]})</b> 기운을 채우는 방향·색·취미·사람을 가까이하면 운이 트입니다.`);
+  if (yong) advices.push(`사주에 부족한 <b>${yong}(${HANJA[yong]})</b> 기운을 채우는 방향·색·취미·사람을 가까이하면 좋다고 봅니다.`);
   else if (sajuEl) advices.push(`이미 강한 <b>${sajuEl}(${HANJA[sajuEl]})</b> 기운이 치우치지 않도록 <b>${SHENG[sajuEl]}(${HANJA[SHENG[sajuEl]]})</b> 활동으로 흘려보내 균형을 잡으세요.`);
   if (sajuProfile?.advice) advices.push(firstSent(sajuProfile.advice));
-  advices.push('관상·수상은 노력으로 바뀝니다. 운명은 정해진 게 아니라 개척하는 것입니다.');
+  advices.push('사주·관상·수상 모두 과학적으로 검증된 예측이 아닙니다. 결과는 자기 성찰의 재료로만 쓰고, 삶의 방향은 스스로 정하세요.');
   const adviceText = advices.join(' ');
 
   const sections = [
     { title: '타고난 성격·기질', icon: 'fa-fingerprint', body: characterText },
-    { title: '강점', icon: 'fa-star', body: strengthText },
-    { title: '주의할 점', icon: 'fa-triangle-exclamation', body: cautionText },
-    { title: '일·적성', icon: 'fa-briefcase', body: aptText },
+    { title: '강점', icon: 'fa-star', body: strengthText + strengthExtra },
+    { title: '주의할 점', icon: 'fa-triangle-exclamation', body: cautionText + cautionExtra },
+    { title: '일·적성', icon: 'fa-briefcase', body: aptText + aptExtra },
     { title: '대인·관계', icon: 'fa-people-group', body: relationText },
     { title: '개운 조언', icon: 'fa-lightbulb', body: adviceText },
   ].filter(s => s.body && s.body.trim());

@@ -3,7 +3,7 @@
 // 종합 / 재물·직업·연애·건강운 / 과거·올해·향후10년 / 오늘 / 합충형 / 궁합.
 // 말투: 정중한 존댓말 + 어려운 한자어는 쉬운 말로 풀고 용어는 괄호로만 보조.
 
-import { STEM_KO, BRANCH_KO, BRANCH_ANIMAL, ELEM_HANJA, STEM_ELEM, TENGOD_GROUP, compatibility, godGroupOfElement } from './saju_engine.mjs?v=10';
+import { STEM_KO, BRANCH_KO, BRANCH_ANIMAL, ELEM_HANJA, STEM_ELEM, TENGOD_GROUP, compatibility, godGroupOfElement } from './saju_engine.mjs?v=11';
 
 // 십성(10가지 기운)을 한 단어 쉬운 말로
 const GOD_EASY = {
@@ -301,11 +301,11 @@ export function pastReading(c) {
 
 // ───────────────────────── 올해 운세 ─────────────────────────
 export function yearReading(c) {
-  const y = c.today.getFullYear();
+  const y = c.curSajuYear || c.today.getFullYear(); // 세운은 입춘 기준으로 바뀜
   const s = c.seun.find(x => x.year === y) || c.seun[0];
   const cur = c.daeun.list[c.daeun.currentIdx];
   const lines = [];
-  lines.push(`<b>${y}년</b>은 <b>${BRANCH_ANIMAL[s.branch]}띠 해</b>(${gz(s.stem, s.branch)})입니다. 올해는 나에게 <b>${godEasy(s.stemGod)}</b>과(와) <b>${godEasy(s.branchGod)}</b>의 기운이 들어옵니다.`);
+  lines.push(`<b>${y}년</b>은 <b>${BRANCH_ANIMAL[s.branch]}띠 해</b>(${gz(s.stem, s.branch)})입니다(사주의 해는 1월 1일이 아닌 <b>입춘</b>에 바뀝니다). 올해는 나에게 <b>${godEasy(s.stemGod)}</b>과(와) <b>${godEasy(s.branchGod)}</b>의 기운이 들어옵니다.`);
   lines.push(godTheme(s.stemGod));
   lines.push(`올해의 기운: <b>${s.fortune.level}</b> ${s.fortune.mark} — ${fortuneSentence(s.fortune.level)}`);
   if (cur) lines.push(`지금의 큰 운(${cur.age}~${cur.endAge}세)이라는 큰 흐름 위에서 올해 한 해가 흘러갑니다. 큰 운이 좋으면 한 해의 작은 굴곡도 무난히 넘기고, 큰 운이 험하면 한 해가 좋아도 신중함이 필요합니다.`);

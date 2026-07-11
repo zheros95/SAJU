@@ -1,7 +1,7 @@
 // palmistry.mjs — 수상 규칙엔진 (손금 5대선·문양은 사진 보며 체크하는 설문 기반)
 // AI 호출 없음. 손금은 자동검출이 불안정해 사용자가 사진을 보며 선택합니다.
-// ⚠️ 수상도 과학적으로 검증된 바 없으며, 손금은 '변하는 신경학적 지표'입니다.
-//    노력으로 좋은 선은 또렷해지고 흉한 선은 옅어질 수 있습니다(개운 가능).
+// ⚠️ 수상은 과학적으로 검증된 바 없습니다. 주요 손바닥 주름은 태아기에 형성되며,
+//    '노력으로 선이 바뀐다'는 주장은 근거가 없어 본 앱은 그런 표현을 쓰지 않습니다.
 
 // 설문 정의 — UI는 이 데이터로 자동 생성됩니다.
 export const PALM_QUESTIONS = [
@@ -88,7 +88,7 @@ const RULES = {
   },
   sun: {
     yes: '태양선이 있어 <b>명예·인기·예술적 성취</b>의 기운이 따릅니다.',
-    no: '태양선이 뚜렷하지 않으나, <b>노력으로 충분히 새길 수 있는</b> 선입니다.',
+    no: '태양선이 뚜렷하지 않습니다. 전통 해석으로는 명예운이 늦게 트이는 편으로 봅니다.',
   },
   marriage: {
     clear: '결혼선이 뚜렷해 <b>인연·애정 관계</b>가 분명한 편입니다.',
@@ -111,8 +111,9 @@ const optLabel = (id, v) => HANDTYPE_LABEL(id).find(o => o.value === v)?.label |
 export function readPalmistry(answers) {
   const a = answers || {};
   const items = [];
-  const ht = HAND[a.handType] || HAND.air;
-  items.push({ area: '손 모양', cls: ht.name, text: ht.t });
+  // 손모양은 자동판별 또는 사용자가 답한 경우에만 — 미응답을 임의 해석하지 않음
+  const ht = a.handType ? HAND[a.handType] : null;
+  if (ht) items.push({ area: '손 모양', cls: ht.name, text: ht.t });
 
   const push = (id, area) => {
     const v = a[id];
@@ -129,24 +130,27 @@ export function readPalmistry(answers) {
   push('simian', '막쥔손금');
   if (a.mystic === 'yes') push('mystic', '신비십자');
 
-  const element = ht.el;
-  const side = a.side === 'left'
-    ? { name: '왼손', mean: '타고난 천성·내면의 잠재력' }
-    : { name: '오른손', mean: '후천적 노력·현재의 사회적 모습' };
-  const lines = [
-    `<b>${side.name}</b>을 기준으로 봤으니, 이 풀이는 주로 <b>${side.mean}</b>을 보여 줍니다.`,
-    `손은 <b>${ht.name}</b> 유형으로, 기질을 오행으로 보면 <b>${element}</b> 기운에 가깝습니다.`,
-    `손금은 고정된 운명이 아니라 <b>변하는 신경학적 지표</b>입니다. 적중감의 정체는 바넘효과·확증편향이니, 자기성찰용 참고로만 보세요.`,
-  ];
+  const element = ht ? ht.el : null;
+  const side = a.side
+    ? (a.side === 'left'
+      ? { name: '왼손', mean: '타고난 천성·내면의 잠재력' }
+      : { name: '오른손', mean: '후천적 노력·현재의 사회적 모습' })
+    : null;
+  const lines = [];
+  if (side) lines.push(`<b>${side.name}</b>을 기준으로 봤으니, 이 풀이는 주로 <b>${side.mean}</b>을 보여 줍니다.`);
+  if (ht) lines.push(`손은 <b>${ht.name}</b> 유형으로, 기질을 오행으로 보면 <b>${element}</b> 기운에 가깝습니다.`);
+  if (!items.length) lines.push('체크한 항목이 없어 손금 풀이를 생략했습니다. 사진을 보며 아는 항목만 골라 주세요.');
+  lines.push(`수상은 과학적으로 검증된 학문이 아닙니다. '잘 맞는다'는 느낌의 정체는 바넘효과·확증편향이니, 자기성찰용 참고로만 보세요.`);
 
   return {
     ok: true,
     items,
     lines,
-    topType: ht.name,
+    topType: ht ? ht.name : null,
     element,
-    profile: { character: ht.character, strength: ht.strength, caution: ht.caution, aptitude: ht.aptitude },
-    side: side.name,
+    profile: ht ? { character: ht.character, strength: ht.strength, caution: ht.caution, aptitude: ht.aptitude } : null,
+    side: side ? side.name : null,
+    answers: a, // 통합 통변에서 손금 답변 활용
     sections: items.map(it => ({ title: it.area, head: it.cls, body: it.text })),
   };
 }

@@ -340,6 +340,8 @@ input:disabled { opacity: .35; }
 .pcol .meta { font-size: .72rem; opacity: .7; }
 .pcol .meta.jj { letter-spacing: .08em; opacity: .55; }
 .mini-note { font-size: .74rem; opacity: .5; margin-top: .8rem; line-height: 1.5; }
+.warn-note { opacity: .95; color: #ffb74d; background: rgba(255,152,0,.1); border: 1px solid rgba(255,152,0,.35); border-radius: 8px; padding: .5rem .7rem; }
+.warn-note b { color: #ffcf8a; }
 
 /* ───────── 배지 ───────── */
 .badges { display: flex; flex-wrap: wrap; gap: .5rem; margin-top: 1.2rem; }

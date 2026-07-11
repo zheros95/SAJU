@@ -61,7 +61,7 @@ export function measureFace(p) {
   const mouthW = dist(p[48], p[54]) || 1;
   const lipH = dist(p[51], p[57]);                 // 입술 두께(위~아래)
   const mouthCornerY = (p[48].y + p[54].y) / 2;
-  const lipMidY = p[62].y;
+  const lipMidY = (p[62].y + p[66].y) / 2;         // 입 수직 중심(안쪽 위·아래 입술 중점) — 위입술만 쓰면 처짐 쪽으로 편향
   const jawW = dist(p[4], p[12]);                  // 하관 폭
 
   // 좌우 대칭: 코 축 기준 대칭쌍 편차 평균(0=완벽 대칭)
@@ -82,7 +82,6 @@ export function measureFace(p) {
     mouthRatio: mouthW / faceW,      // 입 크기
     lipRatio: lipH / mouthW,         // 입술 두께
     mouthTiltN: (mouthCornerY - lipMidY) / mouthW, // +처짐 / -올라감
-    chinRatio: jawW / faceW,         // 턱 발달
     symDev,
   };
 }
@@ -137,10 +136,10 @@ export function readPhysiognomy(p) {
     add('얼굴형', '계란형 · 청수', '청수', '균형 잡힌 <b>계란형</b>. 지성과 조화의 청수(淸秀)한 상으로 학문·예술·전문직에 어울립니다.');
   }
 
-  // 중·하정 균형
-  if (m.midLowRatio > 1.15) add('삼정(三庭)', '중정 발달', null, '코까지의 <b>중정(中庭)</b>이 길어 30~50대 중년의 활동력과 재물 추구가 왕성합니다.');
-  else if (m.midLowRatio < 0.85) add('삼정(三庭)', '하정 발달', null, '턱 쪽 <b>하정(下庭)</b>이 넉넉해 말년운과 아랫사람·부동산 복이 두텁습니다.');
-  else add('삼정(三庭)', '중·하정 균형', null, '중정과 하정이 고르게 균형 잡혀 중년과 말년의 흐름이 안정적입니다.');
+  // 중·하정 균형 (상정=이마는 헤어라인 미검출로 측정 제외 — 삼정 전체가 아님)
+  if (m.midLowRatio > 1.15) add('중·하정', '중정 발달', null, '코까지의 <b>중정(中庭)</b>이 길어 30~50대 중년의 활동력과 재물 추구가 왕성합니다.');
+  else if (m.midLowRatio < 0.85) add('중·하정', '하정 발달', null, '턱 쪽 <b>하정(下庭)</b>이 넉넉해 말년운과 아랫사람·부동산 복이 두텁습니다.');
+  else add('중·하정', '균형', null, '중정과 하정이 고르게 균형 잡혀 중년과 말년의 흐름이 안정적입니다. (이마 위 상정은 사진에서 측정되지 않아 제외)');
 
   // 눈
   if (m.eyeRatio > 0.235) add('눈(眼)', '크고 시원한 눈', '청수', '<b>크고 시원한 눈</b>. 감수성·표현력이 풍부하고 사람을 끄는 힘이 있습니다.');
@@ -166,9 +165,7 @@ export function readPhysiognomy(p) {
   if (m.mouthTiltN < -0.04) add('인상', '올라간 입꼬리', null, '입꼬리가 올라가 <b>밝고 긍정적인 인상</b>을 줍니다. 대인운에 유리합니다.');
   else if (m.mouthTiltN > 0.08) add('인상', '처진 입꼬리', null, '입꼬리가 다소 처져 <b>진중해 보이나</b>, 의식적으로 미소를 더하면 인상이 한결 부드러워집니다.');
 
-  // 턱
-  if (m.chinRatio > 0.78) add('턱(地閣)', '발달한 턱', '위맹', '<b>턱이 단단해</b> 의지와 책임감이 강하고 끝맺음이 야무집니다.');
-  else if (m.chinRatio < 0.55) add('턱(地閣)', '갸름한 턱', '청수', '<b>턱이 갸름해</b> 섬세하고 세련됐으나, 끈기를 의식적으로 보완하면 좋습니다.');
+  // (턱 항목은 '얼굴형'의 하관 측정과 동일 지표라 중복 가중을 피하기 위해 제외)
 
   // 좌우 대칭
   if (m.symDev < 0.04) add('균형(對稱)', '좌우 대칭', '청수', '얼굴 좌우가 고르게 <b>균형</b> 잡혀 안정감과 신뢰감을 줍니다.');
@@ -179,8 +176,8 @@ export function readPhysiognomy(p) {
   const element = TYPE_ELEM[topType] || '금';
 
   const lines = [
-    `전체적으로 <b>${topType}(${TYPE_DESC[topType]})</b> 기운이 두드러지는 상입니다.`,
-    `관상의 기질을 오행으로 환산하면 <b>${element}(${ELEM_HANJA[element]})</b> 기운에 가깝습니다. ${'사주의 오행 분포와 함께 보면 더 입체적으로 읽을 수 있습니다.'}`,
+    `전체적으로 <b>${topType}(${TYPE_DESC[topType]})</b> 기운이 두드러지는 상입니다. (관인팔법을 참고해 사진에서 측정 가능한 <b>간이 유형 분류</b>이며, 전통 팔법 전체의 구현은 아닙니다)`,
+    `관상의 기질을 오행으로 환산하면 <b>${element}(${ELEM_HANJA[element]})</b> 기운에 가깝습니다. 이 대응은 전통적으로 확립된 공식이 아니라 본 앱의 해석 틀이니, 사주와의 교차는 참고로만 보세요.`,
   ];
 
   return {

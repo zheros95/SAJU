@@ -609,6 +609,22 @@ export function compatibility(A, B) {
   };
 }
 
+// 만세력 데이터 구멍 대비 폴백 — JDN 60갑자 직접 계산 (일주·시주)
+function fallbackDayHourPillars(sy, sm, sd, h, mi) {
+  // 일주: 입력 달력 날짜 기준 (라이브러리 관행과 동일)
+  const a = Math.floor((14 - sm) / 12), yy = sy + 4800 - a, mm = sm + 12 * a - 3;
+  const jdn = sd + Math.floor((153 * mm + 2) / 5) + 365 * yy + Math.floor(yy / 4) - Math.floor(yy / 100) + Math.floor(yy / 400) - 32045;
+  const dayIdx = ((jdn - 2451803 + 12) % 60 + 60) % 60; // 2000-09-15 = 丙子(12) 기준
+  const dayStem = STEMS[dayIdx % 10], dayBranch = BRANCHES[dayIdx % 12];
+  // 시주: 진태양시 -32분 보정 후 시두법 (야자시는 익일 천간)
+  const t = new Date(sy, sm - 1, sd, h, mi - 32);
+  const D = t.getHours();
+  const S = (D === 23 || D === 0) ? 0 : Math.floor((D + 1) / 2);
+  const CG = { 甲: 0, 己: 0, 乙: 2, 庚: 2, 丙: 4, 辛: 4, 丁: 6, 壬: 6, 戊: 8, 癸: 8 };
+  const hourStem = STEMS[(CG[dayStem] + S + (D === 23 && h === 23 ? 2 : 0)) % 10];
+  return { dayPillarHanja: dayStem + dayBranch, hourPillarHanja: hourStem + BRANCHES[S] };
+}
+
 // ───────────────────────── 통합 계산 ─────────────────────────
 export function buildChart({ year, month, day, hour, minute, isLunar, isLeap, gender, hourUnknown }) {
   let sy = year, sm = month, sd = day;
@@ -616,9 +632,24 @@ export function buildChart({ year, month, day, hour, minute, isLunar, isLeap, ge
     const s = lunarToSolar(year, month, day, isLeap);
     sy = s.solar.year; sm = s.solar.month; sd = s.solar.day;
   }
-  const h = hourUnknown ? 12 : hour;
-  const mi = hourUnknown ? 0 : minute;
-  const raw = calculateSaju(sy, sm, sd, h, mi);
+  let h = hourUnknown ? 12 : hour;
+  let mi = hourUnknown ? 0 : minute;
+
+  // 표준시 이력 보정 — 한국은 1908.4~1911, 1954.3.21~1961.8.9에 UTC+8:30을 썼다.
+  // 그 시기의 벽시계 시각을 현행 UTC+9 등가로 환산(+30분)해 일주·시주·절입 비교의 기준을 통일.
+  // (서머타임 시기는 미반영 — 화면에 한계 고지)
+  const tzHalf =
+    ((sy > 1908 || (sy === 1908 && sm >= 4)) && sy < 1912) ||
+    ((sy > 1954 || (sy === 1954 && (sm > 3 || (sm === 3 && sd >= 21)))) &&
+     (sy < 1961 || (sy === 1961 && (sm < 8 || (sm === 8 && sd <= 9)))));
+  if (tzHalf && !hourUnknown) {
+    const t = new Date(sy, sm - 1, sd, h, mi + 30);
+    sy = t.getFullYear(); sm = t.getMonth() + 1; sd = t.getDate(); h = t.getHours(); mi = t.getMinutes();
+  }
+
+  let raw;
+  try { raw = calculateSaju(sy, sm, sd, h, mi); }
+  catch (e) { raw = fallbackDayHourPillars(sy, sm, sd, h, mi); } // 데이터 구멍(예: 1956-12-31) 폴백
 
   // 년주·월주는 절입 '시각'(분 단위) 기준으로 재산출 — 라이브러리는 일 단위 경계라
   // 절기 경계일 출생 사주가 틀어진다. 일주·시주는 라이브러리(진태양시 보정 포함)를 따른다.
@@ -639,7 +670,11 @@ export function buildChart({ year, month, day, hour, minute, isLunar, isLeap, ge
   const solar = { year: sy, month: sm, day: sd };
   const dayStem = pillars.day[0];
 
-  // 각 기둥 분석
+  // 시간 미상이면 시주를 '계산'에서 제외한 3주 명식 사용 — 가짜 정오 시주가
+  // 오행·신강약·용신·격국·신살·합충을 왜곡하는 것을 방지. 표시(pillarInfo)는 유지.
+  const calcPillars = hourUnknown ? { ...pillars, hour: [null, null], hourUnknown: true } : pillars;
+
+  // 각 기둥 분석 (표시용 — 시간 미상 시주도 참고용으로 보여줌)
   const pillarInfo = {};
   ['year', 'month', 'day', 'hour'].forEach(k => {
     const [s, b] = pillars[k];
@@ -655,23 +690,25 @@ export function buildChart({ year, month, day, hour, minute, isLunar, isLeap, ge
     };
   });
 
-  // 십성 분포 카운트(표면 8자, 일간 제외 7자 + 지지정기)
+  // 십성 분포 카운트(일간 제외 천간 + 지지정기, 시간 미상 시 시주 제외)
   const godCount = {};
   ['비견', '겁재', '식신', '상관', '편재', '정재', '편관', '정관', '편인', '정인'].forEach(g => godCount[g] = 0);
-  ['year', 'month', 'hour'].forEach(k => { godCount[tenGodOfStem(dayStem, pillars[k][0])]++; });
-  ['year', 'month', 'day', 'hour'].forEach(k => { godCount[tenGodOfBranch(dayStem, pillars[k][1])]++; });
+  ['year', 'month', 'hour'].forEach(k => { const s = calcPillars[k][0]; if (s) godCount[tenGodOfStem(dayStem, s)]++; });
+  ['year', 'month', 'day', 'hour'].forEach(k => { const b = calcPillars[k][1]; if (b) godCount[tenGodOfBranch(dayStem, b)]++; });
 
   const groupCount = { 비겁: 0, 식상: 0, 재성: 0, 관성: 0, 인성: 0 };
   Object.entries(godCount).forEach(([g, c]) => { groupCount[TENGOD_GROUP[g]] += c; });
 
-  const st = strength(pillars);
-  const ys = yongsin(pillars);
-  const gg = gyeokguk(pillars);
-  const sinsal = computeSinsal(pillars);
+  const st = strength(calcPillars);
+  const ys = yongsin(calcPillars);
+  const gg = gyeokguk(calcPillars);
+  const sinsal = computeSinsal(calcPillars);
   const daeun = computeDaeun(solar, pillars, gender, h, mi);
   const today = new Date();
   const curAge = ageAt(solar, today);
-  const seun = computeSeun(pillars, today.getFullYear(), 11);
+  // 세운은 1월 1일이 아니라 입춘에 바뀜 — 오늘이 속한 '사주년' 기준으로 시작
+  const curSajuYear = sajuYearMonth(today.getFullYear(), today.getMonth() + 1, today.getDate(), today.getHours(), today.getMinutes()).sajuYear;
+  const seun = computeSeun(pillars, curSajuYear, 11);
 
   // 대운·세운에 길흉 등급 부여
   daeun.list.forEach(d => { d.fortune = rateGanzhi(d.stem, d.branch, ys); });
@@ -679,17 +716,26 @@ export function buildChart({ year, month, day, hour, minute, isLunar, isLeap, ge
   // 현재 대운 인덱스
   daeun.currentIdx = daeun.list.findIndex(d => curAge >= d.age && curAge <= d.endAge);
 
-  const relations = computeRelations(pillars, ys);
-  const todayLuck = computeToday(pillars, ys, today);
+  const relations = computeRelations(calcPillars, ys);
+  const todayLuck = computeToday(calcPillars, ys, today);
+
+  // 절입 경계 근접 경고 — 절입시각 계산 오차(±수 분)로 년주·월주가 바뀔 수 있는 구간
+  let termWarning = null;
+  if (!hourUnknown) {
+    const nearMin = Math.round(Math.min(
+      daysToNearestTerm(sy, sm, sd, h, mi, true),
+      daysToNearestTerm(sy, sm, sd, h, mi, false)) * 1440);
+    if (nearMin <= 20) termWarning = nearMin;
+  }
 
   return {
     raw, solar, pillars, pillarInfo, dayStem,
-    elementCount: simpleElementCount(pillars),
-    elementDist: elementDistribution(pillars),
+    elementCount: simpleElementCount(calcPillars),
+    elementDist: elementDistribution(calcPillars),
     godCount, groupCount,
     strength: st, yongsin: ys, gyeokguk: gg, sinsal,
-    daeun, seun, curAge, gender,
-    relations, todayLuck,
+    daeun, seun, curAge, curSajuYear, gender,
+    relations, todayLuck, termWarning, tzHalf,
     today,
   };
 }

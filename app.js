@@ -1,8 +1,8 @@
-import { buildChart } from './saju_engine.mjs?v=10';
-import * as T from './saju_text.mjs?v=10';
+import { buildChart } from './saju_engine.mjs?v=11';
+import * as T from './saju_text.mjs?v=11';
 import { dayMasterDescriptions } from './saju_descriptions.mjs?v=10';
-import { PALM_QUESTIONS, readPalmistry, detectHandType } from './palmistry.mjs?v=5';
-import { readIntegration } from './integration.mjs?v=1';
+import { PALM_QUESTIONS, readPalmistry, detectHandType } from './palmistry.mjs?v=6';
+import { readIntegration } from './integration.mjs?v=2';
 import { annotate, easySummaryCard } from './glossary.mjs?v=2';
 
 // ───────── 오행 색상 ─────────
@@ -106,13 +106,13 @@ let _palmSurveyReady = false;
 function ensurePalmSurvey() {
   if (_palmSurveyReady) return;
   const html = `<div class="palm-survey">
-    <p class="mini-note">손 모양은 사진에서 <b>자동 판별</b>돼. 손금·문양은 사진을 보며 골라줘 (모르겠으면 그대로 둬도 돼).</p>
+    <p class="mini-note">손 모양은 사진에서 <b>자동 판별</b>돼. 손금·문양은 사진을 보며 골라줘 — <b>모르는 항목은 비워 두면 해석에서 빠져</b>(멋대로 좋게 해석하지 않아).</p>
     <p id="hand-auto-status" class="hand-auto-status hidden"></p>
     ${PALM_QUESTIONS.map(q => `
       <div class="form-group palm-q" data-qid="${q.id}">
         <label>${q.label} ${q.hint ? `<span class="hint">${q.hint}</span>` : ''}</label>
         <div class="radio-col">
-          ${q.options.map((o, i) => `<label class="palm-opt"><input type="radio" name="palm-${q.id}" value="${o.value}"${i === 0 ? ' checked' : ''}> ${o.label}</label>`).join('')}
+          ${q.options.map(o => `<label class="palm-opt"><input type="radio" name="palm-${q.id}" value="${o.value}"> ${o.label}</label>`).join('')}
         </div>
       </div>`).join('')}
   </div>`;
@@ -156,10 +156,11 @@ function setAutoQuestionsHidden(hidden) {
     document.querySelector(`.palm-q[data-qid="${qid}"]`)?.classList.toggle('hidden', hidden);
   });
 }
+let handDetectPromise = null; // 제출이 자동판별 완료를 기다리도록 추적 (경쟁상태 방지)
 byId('palm-file').addEventListener('change', () => {
   ensurePalmSurvey();
   setHandAutoStatus('🤖 손모양 자동 분석 중…');
-  (async () => {
+  handDetectPromise = (async () => {
     const img = byId('palm-preview');
     try {
       // img.decode()는 간헐적으로 영원히 안 풀리는 버그가 있어 폴링으로 로드 대기
@@ -231,6 +232,12 @@ document.getElementById('saju-form').addEventListener('submit', async function (
   try {
     const mode = document.querySelector('input[name="mode"]:checked').value;
 
+    // 궁합은 '전통사주 단독'만 지원 — 복합 선택 시 상대방 정보가 무시되는 일이 없도록 명시적으로 안내
+    if (mode === 'couple' && (!views.includes('saju') || views.length > 1)) {
+      alert('💕 궁합 보기는 [전통사주]만 단독 선택했을 때 지원돼요.\n관상·수상을 끄고 다시 눌러 주세요. (관상·수상은 혼자 보기에서 이용 가능)');
+      return;
+    }
+
     // ── 사주 ──
     let saju = null;
     if (views.includes('saju')) {
@@ -255,7 +262,7 @@ document.getElementById('saju-form').addEventListener('submit', async function (
     let face = null;
     if (views.includes('gwansang')) {
       setBusy('관상 분석 중…');
-      const { detectFace, readPhysiognomy } = await import('./physiognomy.mjs?v=1');
+      const { detectFace, readPhysiognomy } = await import('./physiognomy.mjs?v=2');
       const pts = await detectFace(byId('face-preview'));
       if (!pts) { clearBusy(); alert('사진에서 얼굴을 찾지 못했어요. 정면·밝은 곳에서 찍은 얼굴 사진으로 다시 시도해 주세요.'); return; }
       face = readPhysiognomy(pts);
@@ -265,6 +272,11 @@ document.getElementById('saju-form').addEventListener('submit', async function (
     // ── 수상 (손금 설문 기반) ──
     let palm = null;
     if (views.includes('susang')) {
+      // 손모양 자동판별이 진행 중이면 완료까지 대기 (기본값으로 확정되는 경쟁상태 방지)
+      if (handDetectPromise) {
+        setBusy('손 사진 분석 중…');
+        await Promise.race([handDetectPromise, new Promise(res => setTimeout(res, 12000))]).catch(() => {});
+      }
       palm = readPalmistry(readPalmAnswers());
     }
 
@@ -377,10 +389,12 @@ function renderResults({ saju, face, palm, integration }) {
   document.getElementById('couple-result').classList.add('hidden');
   document.getElementById('result-section').classList.remove('hidden');
 
-  // 헤더·오늘 배너는 사주가 있을 때만
+  // 헤더·오늘 배너는 사주가 있을 때만 — 미사용 영역은 반드시 비움
+  // (이전 분석 내용이 남아 있으면 '이미지로 저장' 때 전체 펼침에 섞여 들어감)
   byId('result-head').classList.toggle('hidden', !saju);
   byId('today-banner').classList.toggle('hidden', !saju);
   if (saju) { renderHead(saju); renderToday(saju); }
+  else { byId('result-head').innerHTML = ''; byId('today-banner').innerHTML = ''; }
 
   // 사주 탭
   setTabVisible('chart', !!saju);
@@ -390,19 +404,21 @@ function renderResults({ saju, face, palm, integration }) {
     byId('tab-chart').innerHTML = renderChartTab(saju);
     byId('tab-luck').innerHTML = renderLuckTab(saju);
     byId('tab-time').innerHTML = renderTimeTab(saju);
+  } else {
+    byId('tab-chart').innerHTML = ''; byId('tab-luck').innerHTML = ''; byId('tab-time').innerHTML = '';
   }
 
   // 관상 탭
   setTabVisible('gwansang', !!face);
-  if (face) byId('tab-gwansang').innerHTML = renderGwansangTab(face);
+  byId('tab-gwansang').innerHTML = face ? renderGwansangTab(face) : '';
 
   // 수상 탭
   setTabVisible('susang', !!palm);
-  if (palm) byId('tab-susang').innerHTML = renderSusangTab(palm);
+  byId('tab-susang').innerHTML = palm ? renderSusangTab(palm) : '';
 
   // 통합 탭
   setTabVisible('integration', !!integration);
-  if (integration) byId('tab-integration').innerHTML = renderIntegrationTab(integration);
+  byId('tab-integration').innerHTML = integration ? renderIntegrationTab(integration) : '';
 
   // 어려운 용어 옆에 쉬운 풀이 부착 (원문 유지)
   ['today-banner', 'tab-chart', 'tab-luck', 'tab-time', 'tab-gwansang', 'tab-susang', 'tab-integration']
@@ -429,7 +445,7 @@ function renderGwansangTab(face) {
   </div>`;
   const parts = `<div class="card">
     <h2><i class="fas fa-list-ul"></i> 부위별 풀이</h2>
-    <p class="mini-note">face-api 얼굴 68점 자동 측정 기반 · 정면 사진일수록 정확합니다.</p>
+    <p class="mini-note">face-api 얼굴 68점 자동 측정 기반 · 정면 사진일수록 정확합니다. 이마(상정)는 사진에서 측정되지 않아 제외됩니다.</p>
     <div class="sinsal-list">
       ${face.items.map(it => `<div class="sinsal-chip"><b>${it.area}</b> <span>${it.cls}</span><p>${it.text}</p></div>`).join('')}
     </div>
@@ -454,7 +470,7 @@ function renderSusangTab(palm) {
       ${palm.items.map(it => `<div class="sinsal-chip"><b>${it.area}</b> <span>${it.cls}</span><p>${it.text}</p></div>`).join('')}
     </div>
   </div>`;
-  const disc = `<p class="disclaimer">수상은 통계적으로 검증된 학문이 아니며, 손금은 노력·습관으로 변하는 신경학적 지표입니다. '잘 맞는다'는 느낌은 <b>바넘효과·확증편향</b>이니 자기성찰용 참고로만 보세요.</p>`;
+  const disc = `<p class="disclaimer">수상은 통계적으로 검증된 학문이 아닙니다(주요 손금은 태아기에 형성됩니다). '잘 맞는다'는 느낌은 <b>바넘효과·확증편향</b>이니 자기성찰용 참고로만 보세요.</p>`;
   return head + parts + disc;
 }
 
@@ -609,18 +625,21 @@ function mingsikTable(c) {
       <div class="meta jj">${p.hidden.join('')}</div>
     </div>`;
   }).join('');
-  const note = c.input.hourUnknown ? `<p class="mini-note">※ 태어난 시간을 몰라 시주(時柱)는 참고용입니다. 시주 관련 해석(자식·말년·잠재력)은 정확도가 낮습니다.</p>` : '';
+  let note = c.input.hourUnknown ? `<p class="mini-note">※ 태어난 시간을 몰라 <b>시주(時柱)는 표시만 하고, 아래 모든 해석(오행·신강약·용신·운세)은 시주를 뺀 3주(三柱) 기준</b>으로 계산했습니다. 정확한 출생 시각을 알면 더 정밀해집니다.</p>` : '';
+  if (c.termWarning != null) note += `<p class="mini-note warn-note">⚠️ 출생 시각이 절기 경계에서 약 <b>${c.termWarning}분</b> 거리입니다. 절입시각 계산 오차(±수 분)로 년주·월주가 달라질 수 있으니, 중요한 판단에는 정밀 만세력 대조를 권합니다.</p>`;
+  if (c.tzHalf) note += `<p class="mini-note">※ 출생 시기의 한국 표준시(UTC+8:30)를 현행 기준으로 자동 보정했습니다(+30분). 단, 서머타임 시행 시기는 반영되지 않습니다.</p>`;
   return `<div class="card"><h2><i class="fas fa-table-cells"></i> 사주 명식 (四柱八字)</h2>
     <div class="pillars-grid">${cols}</div>
     <p class="mini-note">칸 안 위→아래 순서: 십성 · 천간 · 지지 · 십성 · 십이운성 · 지장간</p>${note}</div>`;
 }
 
 function ohaengCard(c) {
+  const totalGlyphs = Object.values(c.elementCount).reduce((a, b) => a + b, 0) || 8;
   const bars = ['목', '화', '토', '금', '수'].map(el => {
     const n = c.elementCount[el];
     return `<div class="element-bar">
       <span class="label">${el}(${({ 목: '木', 화: '火', 토: '土', 금: '金', 수: '水' })[el]})</span>
-      <div class="bar-fill"><div class="fill ${ELEM_EN[el]}" data-w="${(n / 8) * 100}%"></div></div>
+      <div class="bar-fill"><div class="fill ${ELEM_EN[el]}" data-w="${(n / totalGlyphs) * 100}%"></div></div>
       <span class="count">${n}</span></div>`;
   }).join('');
   const st = c.strength, ys = c.yongsin;
@@ -664,7 +683,9 @@ function renderLuckTab(c) {
     ['연애·결혼운', 'fa-heart', T.loveLuck(c)],
     ['건강운', 'fa-heart-pulse', T.healthLuck(c)],
   ];
-  return items.map(([title, icon, r]) => `
+  const scoreNote = `<p class="mini-note">점수는 전통 명리의 공식이 아니라 <b>이 앱의 규칙으로 매긴 상대 지표</b>입니다. 숫자 자체보다 항목별 설명을 참고하세요.</p>`;
+  const healthNote = `<p class="disclaimer">건강운은 오행 균형에 대한 <b>전통적 관점의 참고</b>일 뿐, 의학적 진단·예측이 아닙니다. 건강 이상은 반드시 의료 전문가와 상담하세요.</p>`;
+  return scoreNote + items.map(([title, icon, r]) => `
     <div class="card luck-card">
       <div class="luck-head">
         <h2><i class="fas ${icon}"></i> ${title}</h2>
@@ -672,7 +693,7 @@ function renderLuckTab(c) {
       </div>
       <div class="gauge"><div class="gauge-fill ${r.grade.cls}" data-w="${r.score}%"></div></div>
       <ul class="luck-lines">${r.lines.map(l => `<li>${l}</li>`).join('')}</ul>
-    </div>`).join('');
+    </div>`).join('') + healthNote;
 }
 
 // ── 탭3: 과거·올해·미래 ──
@@ -720,7 +741,7 @@ function daeunTimeline(c) {
 
 function seunTimeline(c) {
   const cells = c.seun.map(s => {
-    const cur = s.year === c.today.getFullYear();
+    const cur = s.year === (c.curSajuYear || c.today.getFullYear());
     return `<div class="tl-cell sm f-${s.fortune.level} ${cur ? 'current' : ''}">
       <div class="tl-age">${s.year}</div>
       <div class="tl-gz"><span style="color:${colorOf(s.stem)}">${s.stem}</span><span style="color:${colorOf(s.branch)}">${s.branch}</span></div>
