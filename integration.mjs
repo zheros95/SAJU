@@ -120,5 +120,5 @@ export function readIntegration({ saju, face, palm, sajuProfile }) {
     { title: '개운 조언', icon: 'fa-lightbulb', body: adviceText },
   ].filter(s => s.body && s.body.trim());
 
-  return { ok: true, lines, els, sections };
+  return { ok: true, lines, els, sections, hasSaju: !!saju, srcNames: [saju && '사주', face && '관상', palm && '수상'].filter(Boolean) };
 }

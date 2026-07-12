@@ -5,7 +5,7 @@
 
 // 설문 정의 — UI는 이 데이터로 자동 생성됩니다.
 export const PALM_QUESTIONS = [
-  { id: 'side', label: '🖐 어느 손이야?', hint: '오른손 = 후천·현재 노력, 왼손 = 타고난 천성', options: [
+  { id: 'side', label: '🖐 어느 손이야?', hint: '오른손 = 후천·현재, 왼손 = 타고난 천성 (왼손잡이는 의미가 반대일 수 있어요)', options: [
     { value: 'right', label: '오른손 (주로 쓰는 손)' },
     { value: 'left', label: '왼손' },
   ] },
@@ -122,8 +122,11 @@ export function readPalmistry(answers) {
     if (t) items.push({ area, cls: optLabel(id, v).replace(/\s*\(.*\)$/, ''), text: t });
   };
   push('life', '생명선');
-  push('head', '두뇌선');
-  push('heart', '감정선');
+  // 막쥔손금은 두뇌선·감정선이 하나로 합쳐진 형태 — 개별 해석과 모순되므로 생략
+  if (a.simian !== 'yes') {
+    push('head', '두뇌선');
+    push('heart', '감정선');
+  }
   push('fate', '운명선');
   push('sun', '태양선');
   push('marriage', '결혼선');
@@ -138,7 +141,7 @@ export function readPalmistry(answers) {
     : null;
   const lines = [];
   if (side) lines.push(`<b>${side.name}</b>을 기준으로 봤으니, 이 풀이는 주로 <b>${side.mean}</b>을 보여 줍니다.`);
-  if (ht) lines.push(`손은 <b>${ht.name}</b> 유형으로, 기질을 오행으로 보면 <b>${element}</b> 기운에 가깝습니다.`);
+  if (ht) lines.push(`손은 <b>${ht.name}</b> 유형으로, 기질을 오행으로 보면 <b>${element}</b> 기운에 가깝습니다. (서양 4원소 손유형을 오행에 대응시킨 <b>본 앱의 해석 틀</b>로, 전통적으로 확립된 공식은 아닙니다)`);
   if (!items.length) lines.push('체크한 항목이 없어 손금 풀이를 생략했습니다. 사진을 보며 아는 항목만 골라 주세요.');
   lines.push(`수상은 과학적으로 검증된 학문이 아닙니다. '잘 맞는다'는 느낌의 정체는 바넘효과·확증편향이니, 자기성찰용 참고로만 보세요.`);
 

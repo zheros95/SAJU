@@ -270,8 +270,11 @@ export function computeDaeun(solar, pillars, gender, hh = 12, mi = 0) {
   // 양남음녀 순행 / 음남양녀 역행
   const forward = (yangYear && gender === 'male') || (!yangYear && gender === 'female');
   const days = daysToNearestTerm(solar.year, solar.month, solar.day, hh, mi, forward);
-  let startAge = Math.round(days / 3);
+  const exact = days / 3; // 3일 = 1년
+  let startAge = Math.round(exact);
   if (startAge < 1) startAge = 1;
+  // 전통 정밀도(년·개월) 보존 — 표시용
+  const startYears = Math.floor(exact), startMonths = Math.min(11, Math.round((exact - startYears) * 12));
 
   const dayStem = pillars.day[0];
   let gz = ganzhiIndex(pillars.month[0], pillars.month[1]);
@@ -288,7 +291,7 @@ export function computeDaeun(solar, pillars, gender, hh = 12, mi = 0) {
       stage: twelveStage(dayStem, branch),
     });
   }
-  return { forward, startAge, days, list };
+  return { forward, startAge, days, startExact: { years: startYears, months: startMonths }, list };
 }
 
 // ───────────────────────── 세운(연운) ─────────────────────────
@@ -629,7 +632,14 @@ function fallbackDayHourPillars(sy, sm, sd, h, mi) {
 export function buildChart({ year, month, day, hour, minute, isLunar, isLeap, gender, hourUnknown }) {
   let sy = year, sm = month, sd = day;
   if (isLunar) {
-    const s = lunarToSolar(year, month, day, isLeap);
+    let s;
+    try { s = lunarToSolar(year, month, day, isLeap); }
+    catch (e) {
+      // 만세력 데이터 구멍(예: 음력 1956-11-30) 폴백 — 같은 달 1일을 변환해 일수를 더함
+      const base = lunarToSolar(year, month, 1, isLeap);
+      const t = new Date(base.solar.year, base.solar.month - 1, base.solar.day + (day - 1));
+      s = { solar: { year: t.getFullYear(), month: t.getMonth() + 1, day: t.getDate() } };
+    }
     sy = s.solar.year; sm = s.solar.month; sd = s.solar.day;
   }
   let h = hourUnknown ? 12 : hour;
@@ -720,12 +730,15 @@ export function buildChart({ year, month, day, hour, minute, isLunar, isLeap, ge
   const todayLuck = computeToday(calcPillars, ys, today);
 
   // 절입 경계 근접 경고 — 절입시각 계산 오차(±수 분)로 년주·월주가 바뀔 수 있는 구간
-  let termWarning = null;
+  let termWarning = null, termDayWarning = false;
   if (!hourUnknown) {
     const nearMin = Math.round(Math.min(
       daysToNearestTerm(sy, sm, sd, h, mi, true),
       daysToNearestTerm(sy, sm, sd, h, mi, false)) * 1440);
     if (nearMin <= 20) termWarning = nearMin;
+  } else {
+    // 시간 미상인데 그날이 절기(입춘 등) 당일이면, 출생 시각에 따라 년주·월주 자체가 달라짐
+    if (daysToNearestTerm(sy, sm, sd, 0, 0, true) < 1) termDayWarning = true;
   }
 
   return {
@@ -735,7 +748,7 @@ export function buildChart({ year, month, day, hour, minute, isLunar, isLeap, ge
     godCount, groupCount,
     strength: st, yongsin: ys, gyeokguk: gg, sinsal,
     daeun, seun, curAge, curSajuYear, gender,
-    relations, todayLuck, termWarning, tzHalf,
+    relations, todayLuck, termWarning, termDayWarning, tzHalf,
     today,
   };
 }

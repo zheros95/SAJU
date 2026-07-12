@@ -1,8 +1,8 @@
-import { buildChart } from './saju_engine.mjs?v=11';
-import * as T from './saju_text.mjs?v=11';
+import { buildChart } from './saju_engine.mjs?v=12';
+import * as T from './saju_text.mjs?v=12';
 import { dayMasterDescriptions } from './saju_descriptions.mjs?v=10';
-import { PALM_QUESTIONS, readPalmistry, detectHandType } from './palmistry.mjs?v=6';
-import { readIntegration } from './integration.mjs?v=2';
+import { PALM_QUESTIONS, readPalmistry, detectHandType } from './palmistry.mjs?v=7';
+import { readIntegration } from './integration.mjs?v=3';
 import { annotate, easySummaryCard } from './glossary.mjs?v=2';
 
 // ───────── 오행 색상 ─────────
@@ -206,6 +206,7 @@ function readPerson(sfx) {
   const day = parseInt(byId('birth-day' + sfx).value, 10);
   if (!year || !month || !day) return null;
   if (year < 1900 || year > 2050) return { error: '1900~2050년 출생만 계산할 수 있습니다.' };
+  if (new Date(year, month - 1, day) > new Date()) return { error: '미래 날짜는 입력할 수 없습니다. 생년월일을 확인해 주세요.' };
   const hv = byId('birth-hour' + sfx).value;
   const hourUnknown = hv === '';
   const hour = hourUnknown ? 12 : parseInt(hv, 10);
@@ -263,7 +264,10 @@ document.getElementById('saju-form').addEventListener('submit', async function (
     if (views.includes('gwansang')) {
       setBusy('관상 분석 중…');
       const { detectFace, readPhysiognomy } = await import('./physiognomy.mjs?v=2');
-      const pts = await detectFace(byId('face-preview'));
+      const pts = await Promise.race([
+        detectFace(byId('face-preview')),
+        new Promise((_, rej) => setTimeout(() => rej(new Error('얼굴 분석이 너무 오래 걸립니다. 인터넷 연결을 확인하고 다시 시도해 주세요.')), 25000)),
+      ]);
       if (!pts) { clearBusy(); alert('사진에서 얼굴을 찾지 못했어요. 정면·밝은 곳에서 찍은 얼굴 사진으로 다시 시도해 주세요.'); return; }
       face = readPhysiognomy(pts);
       if (!face.ok) { clearBusy(); alert(face.reason); return; }
@@ -272,10 +276,10 @@ document.getElementById('saju-form').addEventListener('submit', async function (
     // ── 수상 (손금 설문 기반) ──
     let palm = null;
     if (views.includes('susang')) {
-      // 손모양 자동판별이 진행 중이면 완료까지 대기 (기본값으로 확정되는 경쟁상태 방지)
+      // 손모양 자동판별이 진행 중이면 끝까지 대기 (내부에 20초 타임아웃이 있어 유한함)
       if (handDetectPromise) {
         setBusy('손 사진 분석 중…');
-        await Promise.race([handDetectPromise, new Promise(res => setTimeout(res, 12000))]).catch(() => {});
+        await handDetectPromise.catch(() => {});
       }
       palm = readPalmistry(readPalmAnswers());
     }
@@ -460,8 +464,9 @@ function renderSusangTab(palm) {
     <h2><i class="fas fa-hand"></i> 수상 종합</h2>
     <div class="prose">${palm.lines.map(l => `<p>${l}</p>`).join('')}</div>
     <div class="badges">
-      <span class="badge good"><i class="fas fa-hand-sparkles"></i> ${palm.topType}</span>
-      <span class="badge"><i class="fas fa-circle-half-stroke"></i> 오행 ${palm.element}</span>
+      ${palm.side ? `<span class="badge"><i class="fas fa-hand"></i> ${palm.side}</span>` : ''}
+      ${palm.topType ? `<span class="badge good"><i class="fas fa-hand-sparkles"></i> ${palm.topType}</span>` : ''}
+      ${palm.element ? `<span class="badge"><i class="fas fa-circle-half-stroke"></i> 오행 ${palm.element}</span>` : ''}
     </div>
   </div>`;
   const parts = `<div class="card">
@@ -478,9 +483,13 @@ function renderSusangTab(palm) {
 function renderIntegrationTab(intg) {
   const chips = Object.entries(intg.els).map(([k, v]) =>
     `<span class="badge"><i class="fas fa-circle-half-stroke"></i> ${k} ${v}</span>`).join('');
+  const title = intg.hasSaju ? '통합 사주 — 종합 통변' : `${(intg.srcNames || []).join('·')} 통합 분석`;
+  const noteTxt = intg.hasSaju
+    ? '전통 사주(命)를 중심에 두고 관상·수상을 오행으로 엮은 종합 인물평입니다.'
+    : `${(intg.srcNames || []).join('·')}를 오행으로 엮은 종합 해석입니다. (사주까지 입력하면 더 입체적입니다)`;
   const head = `<div class="card integration-card">
-    <h2><i class="fas fa-circle-nodes"></i> 통합 사주 — 종합 통변</h2>
-    <p class="mini-note">전통 사주(命)를 중심에 두고 관상·수상을 오행으로 엮은 종합 인물평입니다.</p>
+    <h2><i class="fas fa-circle-nodes"></i> ${title}</h2>
+    <p class="mini-note">${noteTxt}</p>
     <div class="badges">${chips}</div>
     <div class="prose">${intg.lines.map(l => `<p>${l}</p>`).join('')}</div>
   </div>`;
@@ -606,7 +615,8 @@ function relationsCard(c) {
   }).join('');
   return `<div class="card"><h2><i class="fas fa-link"></i> 합·충·형 (글자 간 작용)</h2>
     <div class="prose">${lines}</div>
-    ${items ? `<div class="rel-list">${items}</div>` : ''}</div>`;
+    ${items ? `<div class="rel-list">${items}</div>` : ''}
+    <p class="mini-note">※ 합·충 표시는 글자 조합 기준의 참고입니다. 실제 합화(合化)의 성립은 글자 간 거리·세력·충파 여부까지 따져야 하며(午未합의 오행은 화·토로 견해가 갈림), 여기서는 반영하지 않습니다.</p></div>`;
 }
 
 function mingsikTable(c) {
@@ -627,6 +637,7 @@ function mingsikTable(c) {
   }).join('');
   let note = c.input.hourUnknown ? `<p class="mini-note">※ 태어난 시간을 몰라 <b>시주(時柱)는 표시만 하고, 아래 모든 해석(오행·신강약·용신·운세)은 시주를 뺀 3주(三柱) 기준</b>으로 계산했습니다. 정확한 출생 시각을 알면 더 정밀해집니다.</p>` : '';
   if (c.termWarning != null) note += `<p class="mini-note warn-note">⚠️ 출생 시각이 절기 경계에서 약 <b>${c.termWarning}분</b> 거리입니다. 절입시각 계산 오차(±수 분)로 년주·월주가 달라질 수 있으니, 중요한 판단에는 정밀 만세력 대조를 권합니다.</p>`;
+  if (c.termDayWarning) note += `<p class="mini-note warn-note">⚠️ 이날은 <b>절기(입춘 등) 당일</b>입니다. 출생 시간을 모르면 년주·월주 자체가 달라질 수 있어, 여기서는 정오 기준으로 표시했습니다. 출생 시각을 확인해 다시 보길 권합니다.</p>`;
   if (c.tzHalf) note += `<p class="mini-note">※ 출생 시기의 한국 표준시(UTC+8:30)를 현행 기준으로 자동 보정했습니다(+30분). 단, 서머타임 시행 시기는 반영되지 않습니다.</p>`;
   return `<div class="card"><h2><i class="fas fa-table-cells"></i> 사주 명식 (四柱八字)</h2>
     <div class="pillars-grid">${cols}</div>
@@ -735,8 +746,10 @@ function daeunTimeline(c) {
       <div class="tl-mark">${d.fortune.mark}</div>
     </div>`;
   }).join('');
+  const se = c.daeun.startExact;
+  const startTxt = se ? ` · 대운 교체 시점: 약 ${se.years}세 ${se.months}개월(표에는 반올림 나이로 표시)` : '';
   return `<div class="timeline">${cells}</div>
-    <p class="legend">◎대길 ○길 –평 △주의 ✕흉 · <span class="now-dot"></span>현재 대운</p>`;
+    <p class="legend">◎대길 ○길 –평 △주의 ✕흉 · <span class="now-dot"></span>현재 대운${startTxt}</p>`;
 }
 
 function seunTimeline(c) {

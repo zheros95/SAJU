@@ -3,7 +3,7 @@
 // 종합 / 재물·직업·연애·건강운 / 과거·올해·향후10년 / 오늘 / 합충형 / 궁합.
 // 말투: 정중한 존댓말 + 어려운 한자어는 쉬운 말로 풀고 용어는 괄호로만 보조.
 
-import { STEM_KO, BRANCH_KO, BRANCH_ANIMAL, ELEM_HANJA, STEM_ELEM, TENGOD_GROUP, compatibility, godGroupOfElement } from './saju_engine.mjs?v=11';
+import { STEM_KO, BRANCH_KO, BRANCH_ANIMAL, ELEM_HANJA, STEM_ELEM, TENGOD_GROUP, compatibility, godGroupOfElement } from './saju_engine.mjs?v=12';
 
 // 십성(10가지 기운)을 한 단어 쉬운 말로
 const GOD_EASY = {
@@ -97,6 +97,11 @@ export function pillarReadings(c) {
   return order.map(k => {
     const p = c.pillarInfo[k], g = GUNG[k];
     const lines = [];
+    // 시간 미상이면 시주 상세 풀이(자식·말년)는 생략 — 가짜 정오 시주 해석 방지
+    if (k === 'hour' && c.input && c.input.hourUnknown) {
+      return { key: k, stem: p.stem, branch: p.branch, gung: g.name, label: g.label, life: g.life,
+        lines: ['출생 시간을 몰라 시주 풀이는 생략합니다. 시간을 알게 되면 다시 입력해 보세요.'] };
+    }
     if (k === 'day') {
       // 일주: 천간=나, 지지=배우자궁
       lines.push(`천간(겉으로 드러나는 나)은 <b>${p.stem}(${p.stemKo}${p.stemElem})</b> — 이 글자가 바로 '나 자신'입니다.`);
@@ -256,6 +261,7 @@ export function loveLuck(c) {
 // ───────────────────────── 건강운 ─────────────────────────
 export function healthLuck(c) {
   const dist = c.elementDist, lines = [];
+  lines.push('아래는 오행 균형을 몸에 빗대어 보는 <b>전통적 관점의 참고</b>일 뿐, 의학적 진단이나 예측이 아닙니다.');
   let s = 60;
   const entries = Object.entries(dist).sort((a, b) => b[1] - a[1]);
   const maxE = entries[0], minE = entries[entries.length - 1];

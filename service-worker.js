@@ -1,6 +1,6 @@
 // 오프라인 캐싱용 서비스 워커
 // 코드를 수정하면 CACHE 버전을 올려야 사용자에게 새 버전이 반영됩니다.
-const CACHE = 'saju-v11';
+const CACHE = 'saju-v12';
 const ASSETS = [
   './',
   './index.html',
@@ -34,13 +34,17 @@ self.addEventListener('activate', (e) => {
 
 self.addEventListener('fetch', (e) => {
   if (e.request.method !== 'GET') return;
+  // 동일 출처는 ?v= 캐시버스터를 무시하고 매칭/저장 — 프리캐시(쿼리 없음)와
+  // 실제 요청(app.js?v=17 등)이 어긋나 최초 오프라인 실행이 깨지는 문제 방지
+  const url = new URL(e.request.url);
+  const sameOrigin = url.origin === location.origin;
+  const key = sameOrigin ? url.origin + url.pathname : e.request;
   e.respondWith(
-    caches.match(e.request).then((cached) => {
+    caches.match(key).then((cached) => {
       const network = fetch(e.request).then((res) => {
-        // 동일 출처 응답만 캐시에 갱신 저장
-        if (res && res.status === 200 && new URL(e.request.url).origin === location.origin) {
+        if (res && res.status === 200 && sameOrigin) {
           const copy = res.clone();
-          caches.open(CACHE).then((c) => c.put(e.request, copy));
+          caches.open(CACHE).then((c) => c.put(key, copy));
         }
         return res;
       }).catch(() => cached);
