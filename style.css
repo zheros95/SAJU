@@ -556,5 +556,5 @@ body.no-scroll { overflow: hidden; }
 .img-sheet-close { background: none; border: 0; color: #e8e6df; font-size: 1.4rem; padding: .2rem .5rem; cursor: pointer; }
 .img-sheet-body { flex: 1; overflow: auto; -webkit-overflow-scrolling: touch; padding: 0 1rem; }
 .img-sheet-body img { display: block; width: 100%; height: auto; border-radius: 8px; }
-.img-sheet-btns { display: flex; padding: .8rem 1rem; padding-bottom: calc(.8rem + env(safe-area-inset-bottom)); }
+.img-sheet-btns { display: flex; padding: .8rem 1rem; background: #0b0c10; border-top: 1px solid rgba(255,255,255,.08); padding-bottom: calc(.8rem + env(safe-area-inset-bottom)); }
 .img-sheet-btns .submit-btn { flex: 1; margin: 0 .4rem; text-align: center; text-decoration: none; }
