@@ -548,3 +548,13 @@ body.easy-off .easy { display: none; }
 .jmeta { font-size: .8rem; opacity: .78; margin-top: .3rem; line-height: 1.5; }
 .jmeta > div { margin-top: .15rem; }
 .jm-k { color: var(--gold-accent); font-weight: 600; margin-right: .3rem; }
+
+/* 이미지 저장 미리보기 시트 */
+body.no-scroll { overflow: hidden; }
+.img-sheet { position: fixed; inset: 0; z-index: 1000; background: rgba(5, 6, 10, .92); display: flex; flex-direction: column; }
+.img-sheet-bar { display: flex; align-items: center; justify-content: space-between; padding: .8rem 1rem; padding-top: calc(.8rem + env(safe-area-inset-top)); color: #e8e6df; font-size: .9rem; }
+.img-sheet-close { background: none; border: 0; color: #e8e6df; font-size: 1.4rem; padding: .2rem .5rem; cursor: pointer; }
+.img-sheet-body { flex: 1; overflow: auto; -webkit-overflow-scrolling: touch; padding: 0 1rem; }
+.img-sheet-body img { display: block; width: 100%; height: auto; border-radius: 8px; }
+.img-sheet-btns { display: flex; padding: .8rem 1rem; padding-bottom: calc(.8rem + env(safe-area-inset-bottom)); }
+.img-sheet-btns .submit-btn { flex: 1; margin: 0 .4rem; text-align: center; text-decoration: none; }

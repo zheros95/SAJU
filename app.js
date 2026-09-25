@@ -305,36 +305,90 @@ document.getElementById('reset-btn').addEventListener('click', () => {
   window.scrollTo(0, 0);
 });
 
-// 결과를 PNG 이미지로 저장 (모든 탭을 펼쳐 한 장으로)
-document.getElementById('save-btn').addEventListener('click', async () => {
-  const btn = document.getElementById('save-btn');
+// 결과를 PNG 이미지로 저장
+// iOS(특히 홈화면 앱)는 download 링크를 무시하므로, 이미지를 만든 뒤 미리보기 창에서
+// 공유 시트(사진 저장) 또는 다운로드로 넘긴다. 캔버스는 iOS 한도(약 1,600만 픽셀) 아래로 맞춘다.
+const MAX_CANVAS_PX = 16e6;
+async function renderImage(root) {
+  const r = root.getBoundingClientRect();
+  const scale = Math.max(1, Math.min(2, Math.sqrt(MAX_CANVAS_PX / (r.width * r.height))));
+  const canvas = await window.html2canvas(root, {
+    backgroundColor: '#0b0c10', scale, useCORS: true,
+    // 복제 문서에서 fadeIn 애니메이션이 처음(opacity 0)부터 다시 시작돼 검게 찍히는 문제 방지
+    onclone: doc => {
+      const st = doc.createElement('style');
+      st.textContent = '*, *::before, *::after { animation: none !important; transition: none !important; }';
+      doc.head.appendChild(st);
+    },
+  });
+  const blob = await new Promise((res, rej) => canvas.toBlob(b => b ? res(b) : rej(new Error('toBlob 실패')), 'image/png'));
+  return blob;
+}
+function showImageSheet(blob, filename) {
+  const url = URL.createObjectURL(blob);
+  const file = new File([blob], filename, { type: 'image/png' });
+  const canShare = !!(navigator.canShare && navigator.canShare({ files: [file] }));
+  const sheet = document.createElement('div');
+  sheet.className = 'img-sheet';
+  sheet.innerHTML = `
+    <div class="img-sheet-bar">
+      <span>${canShare ? '‘사진에 저장’ 또는 길게 눌러 저장' : '아래 버튼으로 저장하거나, 이미지를 길게 눌러 저장'}</span>
+      <button type="button" class="img-sheet-close" aria-label="닫기"><i class="fas fa-xmark"></i></button>
+    </div>
+    <div class="img-sheet-body"><img alt="분석 결과 이미지"></div>
+    <div class="img-sheet-btns">
+      ${canShare ? '<button type="button" class="submit-btn img-sheet-share"><i class="fas fa-arrow-up-from-bracket"></i> 사진에 저장 / 공유</button>' : ''}
+      <a class="submit-btn outline-btn img-sheet-dl" download="${filename}" href="${url}"><i class="fas fa-download"></i> 다운로드</a>
+    </div>`;
+  sheet.querySelector('img').src = url;
+  const close = () => { sheet.remove(); document.body.classList.remove('no-scroll'); setTimeout(() => URL.revokeObjectURL(url), 60000); };
+  sheet.querySelector('.img-sheet-close').addEventListener('click', close);
+  sheet.addEventListener('click', e => { if (e.target === sheet) close(); });
+  const shareBtn = sheet.querySelector('.img-sheet-share');
+  if (shareBtn) shareBtn.addEventListener('click', async () => {
+    try { await navigator.share({ files: [file], title: filename }); }
+    catch (e) { if (e && e.name !== 'AbortError') alert('공유 시트를 열지 못했습니다. 이미지를 길게 눌러 저장해 주세요.'); }
+  });
+  document.body.appendChild(sheet);
+  document.body.classList.add('no-scroll');
+}
+async function saveAsImage(btn, filename, prepare) {
   if (!window.html2canvas) { alert('이미지 저장 모듈을 불러오지 못했습니다. 인터넷 연결을 확인해 주세요.'); return; }
   const orig = btn.innerHTML;
   btn.innerHTML = '<i class="fas fa-spinner fa-spin"></i> 저장 중...';
   btn.disabled = true;
-  const panels = [...document.querySelectorAll('.tab-panel')];
-  const hiddenState = panels.map(p => p.classList.contains('hidden'));
-  const tabs = document.querySelector('.tabs');
-  const btns = document.querySelector('.result-btns');
-  panels.forEach(p => p.classList.remove('hidden'));
-  tabs.style.display = 'none';
-  btns.style.display = 'none';
+  const restore = prepare();
   try {
-    const canvas = await window.html2canvas(document.querySelector('.glass-container'), { backgroundColor: '#0b0c10', scale: 2 });
-    const a = document.createElement('a');
-    a.download = `사주명식_${new Date().toISOString().slice(0, 10)}.png`;
-    a.href = canvas.toDataURL('image/png');
-    a.click();
+    const blob = await renderImage(document.querySelector('.glass-container'));
+    restore();
+    showImageSheet(blob, filename);
   } catch (e) {
     console.error(e);
-    alert('이미지 저장에 실패했습니다.');
+    restore();
+    alert('이미지 저장에 실패했습니다. 화면이 너무 길면 탭을 하나씩 저장해 주세요.');
   } finally {
-    panels.forEach((p, i) => { if (hiddenState[i]) p.classList.add('hidden'); });
-    tabs.style.display = '';
-    btns.style.display = '';
     btn.innerHTML = orig;
     btn.disabled = false;
   }
+}
+const today = () => new Date().toISOString().slice(0, 10);
+
+document.getElementById('save-btn').addEventListener('click', () => {
+  saveAsImage(document.getElementById('save-btn'), `사주명식_${today()}.png`, () => {
+    // 모든 탭을 펼쳐 한 장으로
+    const panels = [...document.querySelectorAll('.tab-panel')];
+    const hiddenState = panels.map(p => p.classList.contains('hidden'));
+    const tabs = document.querySelector('.tabs');
+    const btns = document.querySelector('.result-btns');
+    panels.forEach(p => p.classList.remove('hidden'));
+    tabs.style.display = 'none';
+    btns.style.display = 'none';
+    return () => {
+      panels.forEach((p, i) => { if (hiddenState[i]) p.classList.add('hidden'); });
+      tabs.style.display = '';
+      btns.style.display = '';
+    };
+  });
 });
 
 // 궁합 결과 버튼
@@ -344,30 +398,13 @@ document.getElementById('couple-reset-btn').addEventListener('click', () => {
   window.scrollTo(0, 0);
 });
 
-document.getElementById('couple-save-btn').addEventListener('click', async () => {
-  const btn = document.getElementById('couple-save-btn');
-  if (!window.html2canvas) { alert('이미지 저장 모듈을 불러오지 못했습니다.'); return; }
-  const orig = btn.innerHTML;
-  btn.innerHTML = '<i class="fas fa-spinner fa-spin"></i> 저장 중...';
-  btn.disabled = true;
-  const btns = document.querySelector('#couple-result .result-btns');
-  btns.style.display = 'none';
-  try {
-    const canvas = await window.html2canvas(document.querySelector('.glass-container'), { backgroundColor: '#0b0c10', scale: 2 });
-    const a = document.createElement('a');
-    a.download = `궁합_${new Date().toISOString().slice(0, 10)}.png`;
-    a.href = canvas.toDataURL('image/png');
-    a.click();
-  } catch (e) {
-    console.error(e);
-    alert('이미지 저장에 실패했습니다.');
-  } finally {
-    btns.style.display = '';
-    btn.innerHTML = orig;
-    btn.disabled = false;
-  }
+document.getElementById('couple-save-btn').addEventListener('click', () => {
+  saveAsImage(document.getElementById('couple-save-btn'), `궁합_${today()}.png`, () => {
+    const btns = document.querySelector('#couple-result .result-btns');
+    btns.style.display = 'none';
+    return () => { btns.style.display = ''; };
+  });
 });
-
 // 쉬운 풀이 토글 (양쪽 체크박스 동기화, 끄면 .easy 전체 숨김)
 document.querySelectorAll('.easy-toggle-input').forEach(cb =>
   cb.addEventListener('change', function () {
