@@ -1,11 +1,13 @@
-// integration.mjs — 통합 교차통변 (종합판)
-// 전통 사주(命)의 일간·오행·용신 + 관상 유형 프로필 + 수상 손유형 프로필을
-// '성격/강점/주의점/적성/대인/조언' 주제별로 엮어 하나의 종합 인물평을 만든다.
+// integration.mjs — 통합 화면
+// 사주·관상·수상을 하나의 오행으로 합치지 않는다. 각 체계의 결론과 근거를 나란히 놓고,
+// 비교 가능한 항목에만 일치·상충·판단 불가를 표시한다.
+// 상충을 '겉과 속의 차이'로 풀지 않는다 — 그렇게 하면 어떤 결과도 맞는 해석이 되기 때문.
+// 관상·수상의 오행은 이 앱의 대응표(서양 4원소 손유형 → 오행, 관인팔법 유형 → 오행)에서 나온 값이라
+// 사주와 같아도 독립된 세 체계의 교차검증이 아니다. 화면에도 그렇게 적는다.
 // AI 호출 없음. 규칙 기반.
 
 const HANJA = { 목: '木', 화: '火', 토: '土', 금: '金', 수: '水' };
-const SHENG = { 목: '화', 화: '토', 토: '금', 금: '수', 수: '목' }; // 상생
-const KE = { 목: '토', 토: '수', 수: '화', 화: '금', 금: '목' };     // 상극
+const SHENG = { 목: '화', 화: '토', 토: '금', 금: '수', 수: '목' }; // 상생 (개운 조언에서만 사용)
 
 function dominantElement(c) {
   const ec = c.elementCount || {};
@@ -22,15 +24,13 @@ function firstSent(s) {
   return seg || t;
 }
 
-// 한글 받침에 따라 조사 선택 (오행명 화/토/수=받침없음, 목/금=받침있음)
-function hasJong(w) {
-  const s = String(w); const c = s.charCodeAt(s.length - 1);
-  return c >= 0xac00 && c <= 0xd7a3 && (c - 0xac00) % 28 !== 0;
+const el = v => (v ? `${v}(${HANJA[v]})` : null);
+
+// 두 오행 값의 비교 판정 — 같으면 일치, 다르면 상충(상생·상극으로 완화하지 않음), 하나라도 없으면 판단 불가
+function verdictOf(a, b) {
+  if (!a || !b) return '판단 불가';
+  return a === b ? '일치' : '상충';
 }
-const josaGwa = w => hasJong(w) ? '과' : '와';
-const josaIga = w => hasJong(w) ? '이' : '가';
-const josaRo = w => hasJong(w) ? '으로' : '로';
-const josaEul = w => hasJong(w) ? '을' : '를';
 
 // 입력: { saju(차트|null), face(관상|null), palm(수상|null), sajuProfile(일간 설명|null) }
 export function readIntegration({ saju, face, palm, sajuProfile }) {
@@ -38,87 +38,108 @@ export function readIntegration({ saju, face, palm, sajuProfile }) {
   let sajuEl = null, yong = null;
   if (saju) { sajuEl = dominantElement(saju); yong = saju.yongsin?.primary || null; if (sajuEl) els['사주'] = sajuEl; }
   if (face && face.element) els['관상'] = face.element;
-  if (palm && palm.element) els['수상'] = palm.element; // 손모양 미판별 시 오행 교차 생략
+  if (palm && palm.element) els['수상'] = palm.element;
 
-  // ── 오행 관계 요약 (lines) ──
+  // ── 1) 체계별 결론·근거·한계 ──
+  const sources = [];
+  if (saju) {
+    const ys = saju.yongsin || {}, st = saju.strength || {};
+    const hourNote = saju.input?.hourUnknown ? ' 시각 미상이라 시주를 뺀 3주 기준.' : '';
+    const hs = saju.hourSensitivity;
+    const varies = hs ? Object.entries(hs).filter(([, v]) => !v.stable).map(([k]) => ({ strength: '신강약', yongsin: '용신', gyeokguk: '격국' }[k])) : [];
+    sources.push({
+      name: '사주',
+      conclusion: `일간 ${saju.dayStem} · 가장 많은 오행 ${el(sajuEl)} · 용신 ${el(yong)}${ys.helper ? ` · 희신 ${el(ys.helper)}` : ''}`,
+      basis: `${st.level || ''}(비겁+인성 비율 ${st.ratio != null ? Math.round(st.ratio * 100) + '%' : '-'}) → ${ys.method || '억부'} 처방. ${ys.reason ? firstSent(ys.reason) : ''}`,
+      limits: `오행 개수·비율 중심의 간이 판단이며 통근·투간·합화 성립은 아직 반영하지 않음.${hourNote}${varies.length ? ` 시각에 따라 바뀌는 결론: ${varies.join('·')}.` : ''}`,
+    });
+  }
+  if (face) {
+    sources.push({
+      name: '관상',
+      conclusion: face.topType ? `${face.topType} 유형 → 앱 대응표로 ${el(face.element)}` : '유형 미판정',
+      basis: `얼굴 기준점 비율 측정 ${(face.items || []).length}개 항목`,
+      limits: '측정 임계값은 검증되지 않은 초기 추정치. 각도·조명·표정에 따라 유형이 바뀔 수 있음. 형태 측정이 성격·능력 판단의 타당성을 뜻하지 않음.',
+    });
+  }
+  if (palm) {
+    const answered = Object.keys(palm.answers || {}).filter(k => !['side', 'dominant', 'handType'].includes(k) && palm.answers[k] !== 'unknown').length;
+    sources.push({
+      name: '수상',
+      conclusion: palm.topType ? `${palm.topType} → 앱 대응표로 ${el(palm.element)}` : '손 유형 미판정',
+      basis: `손 비율(자동 판별 또는 설문) + 손금 설문 ${answered}개 응답${palm.unread && palm.unread.length ? ` · 판단 보류 ${palm.unread.length}개` : ''}`,
+      limits: '손금 자체를 판독하지 않고 사용자 설문에 의존. 서양 4원소 손유형을 오행에 대응시킨 것은 이 앱의 틀이며 전통 공식이 아님.',
+    });
+  }
+
+  // ── 2) 비교표 — 오행 값이 있는 쌍만, 일치·상충·판단 불가 ──
+  const compare = [];
+  const pairs = [['관상', '수상'], ['사주', '관상'], ['사주', '수상']];
+  const present = Object.keys(els);
+  for (const [a, b] of pairs) {
+    if (!present.includes(a) && !present.includes(b)) continue; // 둘 다 없으면 행 자체를 생략
+    compare.push({ topic: `${a} 오행 vs ${b} 오행`, a: el(els[a]), b: el(els[b]), verdict: verdictOf(els[a], els[b]) });
+  }
+
+  // ── 3) 요약 문장 ──
   const lines = [];
-  const parts = Object.entries(els).map(([k, v]) => `${k} <b>${v}(${HANJA[v]})</b>`).join(' · ');
-  if (parts) lines.push(`기운을 오행으로 모으면 — ${parts} — 입니다.`);
-  if (face && face.element && palm && palm.element) {
-    const f = face.element, p = palm.element;
-    if (f === p) lines.push(`겉모습(관상)과 손(수상)이 모두 <b>${f}</b>${josaRo(f)} 일치해, 기질이 한 방향으로 또렷합니다.`);
-    else if (SHENG[f] === p || SHENG[p] === f) lines.push(`관상 <b>${f}</b>${josaGwa(f)} 수상 <b>${p}</b>${josaIga(p)} <b>상생(相生)</b>이라 안팎이 자연스럽게 이어집니다.`);
-    else if (KE[f] === p || KE[p] === f) lines.push(`관상 <b>${f}</b>${josaGwa(f)} 수상 <b>${p}</b>${josaIga(p)} <b>상극(相剋)</b>이라 겉과 속에 약간의 긴장이 있는 <b>다면적</b> 유형입니다.`);
-    else lines.push(`관상 <b>${f}</b>${josaGwa(f)} 수상 <b>${p}</b>${josaIga(p)} 달라 여러 얼굴을 쓰는 <b>다면적</b> 성향입니다.`);
-  }
-  if (saju && yong) {
-    const ext = [];
-    if (face && (face.element === yong || SHENG[face.element] === yong)) ext.push('관상');
-    if (palm && (palm.element === yong || SHENG[palm.element] === yong)) ext.push('수상');
-    if (ext.length) lines.push(`사주에 필요한 용신 <b>${yong}(${HANJA[yong]})</b>${josaEul(yong)} ${ext.join('·')}의 기운이 보강하는 <b>후천 개운(開運)형</b>입니다.`);
-  }
+  lines.push('세 체계를 한 오행으로 합치지 않고, 각 결론과 근거를 나란히 둡니다. 비교는 오행 값이 있는 쌍에만 하고 결과는 일치·상충·판단 불가 셋 중 하나입니다.');
+  const agree = compare.filter(c => c.verdict === '일치').length, conflict = compare.filter(c => c.verdict === '상충').length, unknown = compare.filter(c => c.verdict === '판단 불가').length;
+  if (compare.length) lines.push(`비교 ${compare.length}건 — 일치 ${agree} · 상충 ${conflict} · 판단 불가 ${unknown}.`);
+  if (agree) lines.push('일치는 관상·수상의 오행이 이 앱의 대응표에서 나온 값이라 <b>독립된 교차검증이 아닙니다</b>. 같은 방향을 가리킨다는 정도로만 보세요.');
+  if (conflict) lines.push('상충은 "겉과 속이 다르다"로 풀지 않고 <b>판단을 보류</b>합니다. 그렇게 풀면 어떤 결과도 맞는 해석이 되기 때문입니다.');
 
-  // ── 종합 프로필 (sections) ──
-  // 1) 성격·기질
+  // ── 4) 주제별 정리 — 출처를 문장마다 표시, 세 체계를 하나로 묶는 문장은 쓰지 않음 ──
   const charBits = [];
-  if (sajuProfile?.basic) charBits.push(`사주로는 ${firstSent(sajuProfile.basic)}`);
-  if (face?.profile) charBits.push(`관상은 <b>${face.profile.character}</b> 인상`);
-  if (palm?.profile) charBits.push(`손은 <b>${palm.profile.character}</b> 기질`);
-  const characterText = charBits.length ? charBits.join(', ') + '입니다. 이 세 결이 모여 지금의 당신을 이룹니다.' : '';
+  if (sajuProfile?.basic) charBits.push(`[사주] ${firstSent(sajuProfile.basic)}`);
+  if (face?.profile) charBits.push(`[관상] <b>${face.profile.character}</b> 인상으로 분류`);
+  if (palm?.profile) charBits.push(`[수상] <b>${palm.profile.character}</b> 기질로 분류`);
+  const characterText = charBits.join(' / ');
 
-  // 2) 강점
   const strengths = [];
-  if (face?.profile) strengths.push(face.profile.strength);
-  if (palm?.profile) strengths.push(palm.profile.strength);
-  if (sajuEl) strengths.push(`사주의 ${sajuEl}(${HANJA[sajuEl]}) 기운`);
-  const strengthText = strengths.length ? `<b>${strengths.join(' · ')}</b> 등이 강점입니다. 진로와 일상에서 이 무기를 적극 활용하세요.` : '';
-
-  // 3) 주의할 점
-  const cautions = [];
-  if (face?.profile) cautions.push(face.profile.caution);
-  if (palm?.profile) cautions.push(palm.profile.caution);
-  const cautionText = cautions.length ? `${cautions.join('. ')}. 이런 면을 미리 의식하면 실수를 줄이고 관계가 한결 부드러워집니다.` : '';
-
-  // 4) 일·적성
-  const apts = [];
-  if (face?.profile) apts.push(face.profile.aptitude);
-  if (palm?.profile) apts.push(palm.profile.aptitude);
-  let aptText = '';
-  if (sajuProfile?.aptitude) aptText = firstSent(sajuProfile.aptitude) + (apts.length ? ` 관상·수상도 <b>${apts.join(', ')}</b> 방면을 가리킵니다.` : '');
-  else if (apts.length) aptText = `<b>${apts.join(', ')}</b> 방면이 잘 맞습니다.`;
-
-  // 5) 대인·관계
-  const rels = [];
-  if (sajuProfile?.relationship) rels.push(firstSent(sajuProfile.relationship));
-  if (face?.profile) rels.push(face.profile.relation);
-  let relationText = rels.join(' ');
-
-  // 5.5) 손금 답변을 해당 주제에 반영 (손모양만 쓰던 것을 보완)
+  if (sajuEl) strengths.push(`[사주] 사주 글자 중 ${el(sajuEl)} 가장 많음(타고난 성향 표시이며, 채워야 할 오행인 용신과는 별개)`);
+  if (face?.profile) strengths.push(`[관상] ${face.profile.strength}`);
+  if (palm?.profile) strengths.push(`[수상] ${palm.profile.strength}`);
   const pa = palm?.answers || {};
-  let strengthExtra = '', cautionExtra = '', aptExtra = '';
-  if (pa.fate === 'clear') aptExtra = ' 손금의 운명선도 뚜렷해, 한 방향으로 꾸준히 가면 성취가 분명한 편입니다.';
-  else if (pa.fate === 'none' || pa.fate === 'weak') aptExtra = ' 손금의 운명선은 흐릿한데, 전통 해석으로는 정해진 길보다 스스로 만들어 가는 쪽이 어울린다고 봅니다.';
-  if (pa.heart === 'curved') relationText += ' 손금의 감정선도 길게 휘어, 정이 많고 표현이 풍부한 결로 봅니다.';
-  else if (pa.heart === 'straight') relationText += ' 손금의 감정선은 곧아, 감정 표현을 절제하는 결로 봅니다.';
-  if (pa.sun === 'yes') strengthExtra = ' 약지 아래 태양선(명예·인기)이 있어 성취의 기운을 보탭니다.';
-  if (pa.simian === 'yes') cautionExtra = ' 막쥔손금의 강한 집중력은 큰 무기지만 극단으로 흐를 수 있으니 독주를 경계하세요.';
+  if (pa.sun === 'yes') strengths.push('[수상·설문] 태양선 있음 → 전통 해석은 명예·성취의 표지로 봄');
+  const strengthText = strengths.join(' / ');
 
-  // 6) 개운 조언
+  const cautions = [];
+  if (face?.profile) cautions.push(`[관상] ${face.profile.caution}`);
+  if (palm?.profile) cautions.push(`[수상] ${palm.profile.caution}`);
+  if (pa.simian === 'yes') cautions.push('[수상·설문] 막쥔손금 → 전통 해석은 집중력이 극단으로 흐를 수 있다고 봄');
+  const cautionText = cautions.join(' / ');
+
+  const apts = [];
+  if (sajuProfile?.aptitude) apts.push(`[사주] ${firstSent(sajuProfile.aptitude)}`);
+  if (face?.profile) apts.push(`[관상] ${face.profile.aptitude}`);
+  if (palm?.profile) apts.push(`[수상] ${palm.profile.aptitude}`);
+  if (pa.fate === 'clear') apts.push('[수상·설문] 운명선 뚜렷 → 전통 해석은 진로 방향이 분명하다고 봄');
+  else if (pa.fate === 'none' || pa.fate === 'weak') apts.push('[수상·설문] 운명선 약함/없음 → 전통 해석은 정해진 길보다 스스로 만드는 쪽으로 봄');
+  const aptText = apts.join(' / ');
+
+  const rels = [];
+  if (sajuProfile?.relationship) rels.push(`[사주] ${firstSent(sajuProfile.relationship)}`);
+  if (face?.profile?.relation) rels.push(`[관상] ${face.profile.relation}`);
+  if (pa.heart === 'curved') rels.push('[수상·설문] 감정선 길고 휨 → 전통 해석은 정이 많고 표현이 풍부하다고 봄');
+  else if (pa.heart === 'straight') rels.push('[수상·설문] 감정선 곧음 → 전통 해석은 감정 표현을 절제한다고 봄');
+  const relationText = rels.join(' / ');
+
   const advices = [];
-  if (yong) advices.push(`사주에 부족한 <b>${yong}(${HANJA[yong]})</b> 기운을 채우는 방향·색·취미·사람을 가까이하면 좋다고 봅니다.`);
-  else if (sajuEl) advices.push(`이미 강한 <b>${sajuEl}(${HANJA[sajuEl]})</b> 기운이 치우치지 않도록 <b>${SHENG[sajuEl]}(${HANJA[SHENG[sajuEl]]})</b> 활동으로 흘려보내 균형을 잡으세요.`);
-  if (sajuProfile?.advice) advices.push(firstSent(sajuProfile.advice));
+  if (yong) advices.push(`[사주] 용신 ${el(yong)} 기운을 채우는 방향·활동을 가까이하라고 봅니다.`);
+  else if (sajuEl) advices.push(`[사주] 가장 많은 ${el(sajuEl)} 기운이 치우치지 않도록 ${el(SHENG[sajuEl])} 활동으로 흘려보내라고 봅니다.`);
+  if (sajuProfile?.advice) advices.push(`[사주] ${firstSent(sajuProfile.advice)}`);
   advices.push('사주·관상·수상 모두 과학적으로 검증된 예측이 아닙니다. 결과는 자기 성찰의 재료로만 쓰고, 삶의 방향은 스스로 정하세요.');
   const adviceText = advices.join(' ');
 
   const sections = [
-    { title: '타고난 성격·기질', icon: 'fa-fingerprint', body: characterText },
-    { title: '강점', icon: 'fa-star', body: strengthText + strengthExtra },
-    { title: '주의할 점', icon: 'fa-triangle-exclamation', body: cautionText + cautionExtra },
-    { title: '일·적성', icon: 'fa-briefcase', body: aptText + aptExtra },
-    { title: '대인·관계', icon: 'fa-people-group', body: relationText },
-    { title: '개운 조언', icon: 'fa-lightbulb', body: adviceText },
+    { title: '성격·기질 (체계별)', icon: 'fa-fingerprint', body: characterText },
+    { title: '강점 (체계별)', icon: 'fa-star', body: strengthText },
+    { title: '주의할 점 (체계별)', icon: 'fa-triangle-exclamation', body: cautionText },
+    { title: '일·적성 (체계별)', icon: 'fa-briefcase', body: aptText },
+    { title: '대인·관계 (체계별)', icon: 'fa-people-group', body: relationText },
+    { title: '조언', icon: 'fa-lightbulb', body: adviceText },
   ].filter(s => s.body && s.body.trim());
 
-  return { ok: true, lines, els, sections, hasSaju: !!saju, srcNames: [saju && '사주', face && '관상', palm && '수상'].filter(Boolean) };
+  return { ok: true, lines, els, sources, compare, sections, hasSaju: !!saju, srcNames: [saju && '사주', face && '관상', palm && '수상'].filter(Boolean) };
 }

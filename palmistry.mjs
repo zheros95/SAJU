@@ -5,8 +5,12 @@
 
 // 설문 정의 — UI는 이 데이터로 자동 생성됩니다.
 export const PALM_QUESTIONS = [
-  { id: 'side', label: '🖐 어느 손이야?', hint: '오른손 = 후천·현재, 왼손 = 타고난 천성 (왼손잡이는 의미가 반대일 수 있어요)', options: [
-    { value: 'right', label: '오른손 (주로 쓰는 손)' },
+  { id: 'side', label: '🖐 사진의 손', hint: '어느 손을 찍었는지', options: [
+    { value: 'right', label: '오른손' },
+    { value: 'left', label: '왼손' },
+  ] },
+  { id: 'dominant', label: '✍️ 주로 쓰는 손', hint: '전통 해석은 주로 쓰는 손 = 후천·현재, 반대 손 = 타고난 천성으로 봅니다', options: [
+    { value: 'right', label: '오른손' },
     { value: 'left', label: '왼손' },
   ] },
   { id: 'handType', label: '✋ 손 모양', hint: '손바닥과 손가락의 전체 비율', options: [
@@ -19,37 +23,45 @@ export const PALM_QUESTIONS = [
     { value: 'long_deep', label: '길고 뚜렷하다' },
     { value: 'medium', label: '보통이다' },
     { value: 'short_faint', label: '짧거나 희미하다' },
+    { value: 'unknown', label: '모르겠다 / 사진으로 판단 불가' },
   ] },
   { id: 'head', label: '두뇌선', hint: '손바닥을 가로지르는 가운데 선', options: [
     { value: 'straight', label: '곧게 뻗는다 (현실·논리형)' },
     { value: 'curved', label: '아래로 휜다 (상상·창의형)' },
     { value: 'short', label: '짧다 (직관·실행형)' },
+    { value: 'unknown', label: '모르겠다 / 사진으로 판단 불가' },
   ] },
   { id: 'heart', label: '감정선', hint: '손가락 아래 가로로 흐르는 선', options: [
     { value: 'curved', label: '길고 휘어진다 (다정·표현형)' },
     { value: 'straight', label: '곧고 짧다 (절제·이성형)' },
+    { value: 'unknown', label: '모르겠다 / 사진으로 판단 불가' },
   ] },
   { id: 'fate', label: '운명선', hint: '손목에서 가운데로 올라가는 세로선', options: [
     { value: 'clear', label: '뚜렷하다' },
     { value: 'weak', label: '약하다' },
-    { value: 'none', label: '없다 / 모르겠다' },
+    { value: 'none', label: '없다 (찾아봤지만 안 보인다)' },
+    { value: 'unknown', label: '모르겠다 / 사진으로 판단 불가' },
   ] },
   { id: 'sun', label: '태양선', hint: '약지(넷째) 아래로 오르는 세로선', options: [
     { value: 'yes', label: '있다' },
-    { value: 'no', label: '없다 / 모르겠다' },
+    { value: 'no', label: '없다 (찾아봤지만 안 보인다)' },
+    { value: 'unknown', label: '모르겠다 / 사진으로 판단 불가' },
   ] },
   { id: 'marriage', label: '결혼선', hint: '새끼손가락 아래 짧은 가로선', options: [
     { value: 'clear', label: '뚜렷한 선이 있다' },
     { value: 'faint', label: '희미하다' },
-    { value: 'none', label: '없다 / 모르겠다' },
+    { value: 'none', label: '없다 (찾아봤지만 안 보인다)' },
+    { value: 'unknown', label: '모르겠다 / 사진으로 판단 불가' },
   ] },
   { id: 'simian', label: '막쥔손금(원숭이선)', hint: '두뇌선과 감정선이 한 줄로 손바닥을 가로지름', options: [
     { value: 'no', label: '아니다 (선이 둘로 나뉜다)' },
     { value: 'yes', label: '그렇다 (한 줄로 가로지른다)' },
+    { value: 'unknown', label: '모르겠다 / 사진으로 판단 불가' },
   ] },
   { id: 'mystic', label: '신비십자', hint: '손바닥 한가운데의 + 자 무늬', options: [
-    { value: 'no', label: '없다 / 모르겠다' },
+    { value: 'no', label: '없다 (찾아봤지만 안 보인다)' },
     { value: 'yes', label: '있다' },
+    { value: 'unknown', label: '모르겠다 / 사진으로 판단 불가' },
   ] },
 ];
 
@@ -115,9 +127,10 @@ export function readPalmistry(answers) {
   const ht = a.handType ? HAND[a.handType] : null;
   if (ht) items.push({ area: '손 모양', cls: ht.name, text: ht.t });
 
+  const unread = []; // 판단 보류 — '모르겠다' 또는 미응답. 없다고 해석하지 않는다
   const push = (id, area) => {
     const v = a[id];
-    if (!v) return;
+    if (!v || v === 'unknown') { unread.push(area); return; }
     const t = RULES[id]?.[v];
     if (t) items.push({ area, cls: optLabel(id, v).replace(/\s*\(.*\)$/, ''), text: t });
   };
@@ -132,17 +145,24 @@ export function readPalmistry(answers) {
   push('marriage', '결혼선');
   push('simian', '막쥔손금');
   if (a.mystic === 'yes') push('mystic', '신비십자');
+  else if (!a.mystic || a.mystic === 'unknown') unread.push('신비십자');
 
   const element = ht ? ht.el : null;
-  const side = a.side
-    ? (a.side === 'left'
-      ? { name: '왼손', mean: '타고난 천성·내면의 잠재력' }
-      : { name: '오른손', mean: '후천적 노력·현재의 사회적 모습' })
-    : null;
+  // 손의 의미는 '주로 쓰는 손' 기준 — 주로 쓰는 손 = 후천·현재, 반대 손 = 천성
+  let side = null;
+  if (a.side) {
+    const name = a.side === 'left' ? '왼손' : '오른손';
+    if (a.dominant) {
+      const isDom = a.side === a.dominant;
+      side = { name, mean: isDom ? '후천적 노력·현재의 사회적 모습' : '타고난 천성·내면의 잠재력', basis: `주로 쓰는 손이 ${a.dominant === 'left' ? '왼손' : '오른손'}` };
+    } else side = { name, mean: null, basis: '주로 쓰는 손을 답하지 않아 어느 쪽 의미인지 정하지 않음' };
+  }
   const lines = [];
-  if (side) lines.push(`<b>${side.name}</b>을 기준으로 봤으니, 이 풀이는 주로 <b>${side.mean}</b>을 보여 줍니다.`);
+  if (side && side.mean) lines.push(`<b>${side.name}</b> 사진이고 ${side.basis}이니, 전통 해석으로는 주로 <b>${side.mean}</b>을 보는 손입니다.`);
+  else if (side) lines.push(`<b>${side.name}</b> 사진입니다. ${side.basis}. (주로 쓰는 손이면 후천·현재, 반대 손이면 천성으로 봅니다)`);
   if (ht) lines.push(`손은 <b>${ht.name}</b> 유형으로, 기질을 오행으로 보면 <b>${element}</b> 기운에 가깝습니다. (서양 4원소 손유형을 오행에 대응시킨 <b>본 앱의 해석 틀</b>로, 전통적으로 확립된 공식은 아닙니다)`);
   if (!items.length) lines.push('체크한 항목이 없어 손금 풀이를 생략했습니다. 사진을 보며 아는 항목만 골라 주세요.');
+  if (unread.length) lines.push(`<b>판단 보류</b>: ${unread.join('·')} — 확인하지 못한 항목은 '없다'로 보지 않고 풀이에서 뺐습니다.`);
   lines.push(`수상은 과학적으로 검증된 학문이 아닙니다. '잘 맞는다'는 느낌의 정체는 바넘효과·확증편향이니, 자기성찰용 참고로만 보세요.`);
 
   return {
@@ -153,6 +173,8 @@ export function readPalmistry(answers) {
     element,
     profile: ht ? { character: ht.character, strength: ht.strength, caution: ht.caution, aptitude: ht.aptitude } : null,
     side: side ? side.name : null,
+    sideMeaning: side ? side.mean : null,
+    unread,
     answers: a, // 통합 통변에서 손금 답변 활용
     sections: items.map(it => ({ title: it.area, head: it.cls, body: it.text })),
   };

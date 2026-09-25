@@ -152,12 +152,28 @@ const STEM_EASY = {
 };
 
 const STRENGTH_EASY = {
-  극신강: '내 기운이 아주 강하게 쏠려 있어, 그 힘을 밖으로 쓰는 활동이 특히 중요합니다.',
-  신강: '내 기운이 든든한 편이라, 스스로 결정하고 끌고 가는 힘이 좋습니다.',
-  중화: '기운이 균형 잡혀 있어, 상황에 따라 유연하게 움직일 수 있는 좋은 구조입니다.',
-  신약: '혼자 힘으로 밀어붙이기보다, 주변의 도움과 환경을 잘 활용할 때 더 잘 풀리는 타입입니다.',
-  극신약: '내 기운이 많이 약한 편이라, 함께하는 사람과 환경 선택이 특히 중요합니다.',
+  극신강: '내 힘이 아주 강하게 쏠려 있어, 그 힘을 밖으로 쓰는 활동이 특히 중요합니다.',
+  신강: '내 힘이 든든한 편이라, 스스로 결정하고 끌고 가는 힘이 좋습니다.',
+  중화: '내 힘이 균형 잡혀 있어, 상황에 따라 유연하게 움직일 수 있는 좋은 구조입니다.',
+  신약: '내 힘이 조금 부족해, 혼자 밀어붙이기보다 주변의 도움과 환경을 잘 활용할 때 더 잘 풀리는 타입입니다.',
+  극신약: '내 힘이 많이 약한 편이라, 함께하는 사람과 환경 선택이 특히 중요합니다.',
 };
+// 받침 유무로 조사 선택
+const jo = (w, a, b) => { const ch = w.charCodeAt(w.length - 1); return ch >= 0xac00 && ch <= 0xd7a3 && (ch - 0xac00) % 28 ? a : b; };
+const NUM_KO = { 8: '여덟', 6: '여섯' };
+// 용신이 '왜' 그 오행인지 — 가장 많은 오행과 처방이 다른 이유를 한 줄로
+function yongsinWhy(c, max) {
+  const ys = c.yongsin || {}, st = c.strength || {};
+  const me = st.dayElem, y = ys.primary;
+  const H = e => `${e}(${HANJA[e]})`;
+  if (!me || !y) return '';
+  if (st.level === '중화') return '힘의 균형이 잡혀 있어, 부족한 쪽을 살짝 보태는 처방입니다.';
+  if (ys.strong) return `${H(me)}인 나의 힘이 넘치는 편이라, 그 힘을 밖으로 흘려보내게 하는 오행입니다.`;
+  const drain = max && max !== me && max !== st.inElem ? `${H(max)}${jo(max, '이', '가')} 많아 ` : '';
+  if (y === st.inElem) return `${drain}${H(me)}인 나의 힘이 새는 편이라, 나를 길러 주는 ${H(y)}로 채우는 처방입니다.`;
+  if (y === me) return `${drain}${H(me)}인 나의 힘이 부족한 편이라, 나와 같은 ${H(y)}를 늘려 힘을 키우는 처방입니다.`;
+  return `${H(me)}인 나의 힘이 부족한 편이라, 균형을 잡아 주는 오행입니다.`;
+}
 
 const ELEM_EASY = {
   목: '초록색, 식물, 숲, 새로 배우는 일',
@@ -172,18 +188,23 @@ export function easySummaryCard(c) {
   const lines = [];
   const se = STEM_EASY[c.dayStem];
   if (se) lines.push(`<b>나라는 사람</b> — 당신을 자연에 비유하면 <b>${se[0]}</b>입니다. ${se[1]}`);
-  const st = STRENGTH_EASY[c.strength?.level];
-  if (st) lines.push(`<b>기운의 세기</b> — ${st}`);
+  const lv = c.strength?.level;
+  const st = STRENGTH_EASY[lv];
+  if (st) lines.push(`<b>내 힘의 세기</b> — <b>${lv}</b>. ${st}`);
   const ec = c.elementCount || {};
   const keys = Object.keys(ec);
+  let max = null;
   if (keys.length) {
-    const max = keys.sort((a, b) => ec[b] - ec[a])[0];
+    max = keys.sort((a, b) => ec[b] - ec[a])[0];
     const zero = keys.filter(k => !ec[k]);
-    let s = `<b>기운 분포</b> — 사주에 <b>${max}(${HANJA[max]})</b> 기운이 가장 많${zero.length ? `고, <b>${zero.join('·')}</b> 기운은 없는 편입` : '습'}니다.`;
-    lines.push(s);
+    const total = keys.reduce((a, k) => a + ec[k], 0);
+    lines.push(`<b>글자 개수</b> — 사주 ${NUM_KO[total] || total} 글자 중 <b>${max}(${HANJA[max]})</b>${jo(max, '이', '가')} ${ec[max]}개로 가장 많${zero.length ? `고, <b>${zero.join('·')}</b>${jo(zero[zero.length - 1], '은', '는')} 하나도 없습` : '습'}니다. 개수는 타고난 성향을 보여줄 뿐, 많다고 좋은 것도 없다고 나쁜 것도 아닙니다.`);
   }
   const y = c.yongsin?.primary;
-  if (y && ELEM_EASY[y]) lines.push(`<b>나에게 보약이 되는 기운</b> — <b>${y}(${HANJA[y]})</b>. 생활에서는 ${ELEM_EASY[y]} 같은 것들을 가까이하면 좋습니다.`);
+  if (y && ELEM_EASY[y]) {
+    const h = c.yongsin.helper;
+    lines.push(`<b>채우면 좋은 오행 · 용신</b> — <b>${y}(${HANJA[y]})</b>. ${yongsinWhy(c, max)}${h ? ` 이를 거드는 희신은 <b>${h}(${HANJA[h]})</b>입니다.` : ''} 생활에서는 ${ELEM_EASY[y]} 같은 것들을 가까이하면 좋습니다.`);
+  }
   const gk = c.gyeokguk?.name;
   if (gk) lines.push(`<b>타고난 패턴</b> — ${gk} 구조입니다.`); // 쉬운 풀이는 annotate()가 자동 부착
   lines.push(`아래 자세한 풀이에서 <b>어려운 용어 옆 괄호</b>가 쉬운 설명입니다. 너무 깊이 읽기 어려우면 이 요약과 각 카드의 굵은 글씨만 봐도 충분합니다.`);

@@ -1,7 +1,10 @@
 // solar_terms.mjs — 12절기(節) 절입시각 계산 (1900~2050, KST 분 단위)
 // 사주 년주(입춘)·월주(12절) 경계는 절입 '시각' 기준이어야 한다.
-// Meeus(Astronomical Algorithms 25장) 태양 시황경 + Espenak-Meeus ΔT로
-// 태양 황경이 315°+30°k 에 도달하는 순간을 이분 탐색한다. 오차 수 분 이내.
+// VSOP87D(절단판) 태양 시황경 + Espenak-Meeus ΔT로
+// 태양 황경이 315°+30°k 에 도달하는 순간을 이분 탐색한다.
+// 정확도: KASI 달력자료(분 단위)와 대조해 tests/test_solar_terms.mjs 로 검증 — 주장은 그 결과까지만.
+
+import { L0, L1, L2, L3, L4, R0, R1, R2, R3 } from './vsop87d_earth.mjs';
 
 const RAD = Math.PI / 180;
 
@@ -17,17 +20,33 @@ function deltaT(y) {
 }
 
 // UT(ms epoch) → 태양 시황경(도, 0~360)
+// VSOP87D 지구 일심 황경(절단판, vsop87d_earth.mjs) + 180° → 지심 기하황경,
+// 여기에 장동(Δψ, Meeus 22장 간략식 ±0.5″)과 광행차(-20.4898″/R)를 더한 시황경.
+// FK5 보정(-0.09″)은 생략. 검증: tests/test_solar_terms.mjs (KASI 달력자료 2023~2028, 분 단위)
+function sumSeries(series, tau) {
+  let r = 0, p = 1;
+  for (let i = 0; i < series.length; i++) {
+    let s = 0;
+    const S = series[i];
+    for (let j = 0; j < S.length; j++) s += S[j][0] * Math.cos(S[j][1] + S[j][2] * tau);
+    r += s * p; p *= tau;
+  }
+  return r;
+}
 function sunLongitude(msUT) {
   const year = new Date(msUT).getUTCFullYear();
-  const jd = msUT / 86400000 + 2440587.5 + deltaT(year) / 86400; // TT 보정
-  const T = (jd - 2451545.0) / 36525;
-  const L0 = 280.46646 + 36000.76983 * T + 0.0003032 * T * T;
-  const M = (357.52911 + 35999.05029 * T - 0.0001537 * T * T) * RAD;
-  const C = (1.914602 - 0.004817 * T - 0.000014 * T * T) * Math.sin(M)
-    + (0.019993 - 0.000101 * T) * Math.sin(2 * M)
-    + 0.000289 * Math.sin(3 * M);
-  const omega = (125.04 - 1934.136 * T) * RAD;
-  const lam = L0 + C - 0.00569 - 0.00478 * Math.sin(omega); // 시황경(광행차·장동 보정)
+  const jde = msUT / 86400000 + 2440587.5 + deltaT(year) / 86400; // TT
+  const tau = (jde - 2451545.0) / 365250;                            // 율리우스 천년
+  const T = tau * 10;
+  const L = sumSeries([L0, L1, L2, L3, L4], tau);                     // 지구 일심 황경(rad)
+  const R = sumSeries([R0, R1, R2, R3], tau);                          // 거리(AU)
+  let lam = L / RAD + 180;                                             // 지심 기하황경(도)
+  // 장동 Δψ (Meeus 22장 간략식)
+  const omega = (125.04452 - 1934.136261 * T) * RAD;
+  const Ls = (280.4665 + 36000.7698 * T) * RAD, Lm = (218.3165 + 481267.8813 * T) * RAD;
+  const dpsi = (-17.20 * Math.sin(omega) - 1.32 * Math.sin(2 * Ls) - 0.23 * Math.sin(2 * Lm) + 0.21 * Math.sin(2 * omega)) / 3600;
+  const aberr = -20.4898 / 3600 / R;
+  lam += dpsi + aberr;
   return ((lam % 360) + 360) % 360;
 }
 

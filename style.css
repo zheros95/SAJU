@@ -530,3 +530,21 @@ body.easy-off .easy { display: none; }
   .cp-ming { font-size: .7rem; }
   .cp-score-num { font-size: 1.9rem; }
 }
+
+/* 통합 나란히 보기 */
+.table-wrap { overflow-x: auto; margin: 10px 0; }
+.cmp-table { width: 100%; border-collapse: collapse; font-size: 0.86rem; }
+.cmp-table th, .cmp-table td { border-bottom: 1px solid rgba(255,255,255,0.12); padding: 6px 8px; text-align: left; vertical-align: top; }
+.cmp-table thead th { font-weight: 600; opacity: 0.8; }
+.cmp-table .dim-text { opacity: 0.7; }
+.badge.warn { background: rgba(255,170,60,0.18); color: #ffc46b; }
+
+/* 판단 기록 */
+.jstat { display: inline-block; font-size: .72rem; font-weight: 700; padding: .1rem .5rem; border-radius: 10px; margin-right: .3rem; vertical-align: middle; }
+.jstat-ok { background: rgba(76,175,80,.2); color: #7ed884; }
+.jstat-cond { background: rgba(255,170,60,.18); color: #ffc46b; }
+.jstat-hold { background: rgba(255,255,255,.1); color: #bbb; }
+.jstat-no { background: rgba(244,67,54,.18); color: #ff8a80; }
+.jmeta { font-size: .8rem; opacity: .78; margin-top: .3rem; line-height: 1.5; }
+.jmeta > div { margin-top: .15rem; }
+.jm-k { color: var(--gold-accent); font-weight: 600; margin-right: .3rem; }

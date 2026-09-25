@@ -3,7 +3,8 @@
 // 종합 / 재물·직업·연애·건강운 / 과거·올해·향후10년 / 오늘 / 합충형 / 궁합.
 // 말투: 정중한 존댓말 + 어려운 한자어는 쉬운 말로 풀고 용어는 괄호로만 보조.
 
-import { STEM_KO, BRANCH_KO, BRANCH_ANIMAL, ELEM_HANJA, STEM_ELEM, TENGOD_GROUP, compatibility, godGroupOfElement } from './saju_engine.mjs?v=12';
+import { STEM_KO, BRANCH_KO, BRANCH_ANIMAL, ELEM_HANJA, STEM_ELEM, TENGOD_GROUP, compatibility, godGroupOfElement } from './saju_engine.mjs?v=14';
+import { buildJudgments, scoreOf } from './judgments.mjs?v=1';
 
 // 십성(10가지 기운)을 한 단어 쉬운 말로
 const GOD_EASY = {
@@ -16,6 +17,10 @@ const godEasy = (g) => GOD_EASY[g] || g;
 const GRP_EASY = { 비겁: '자립심과 경쟁심', 식상: '표현력과 재능', 재성: '재물과 활동력', 관성: '명예와 책임감', 인성: '배움과 포용력' };
 // 오행 이미지
 const ELEM_IMG = { 목: '나무', 화: '불', 토: '흙', 금: '쇠·바위', 수: '물' };
+// 받침 유무로 조사 선택
+const jo = (w, a, b) => { const ch = w.charCodeAt(w.length - 1); return ch >= 0xac00 && ch <= 0xd7a3 && (ch - 0xac00) % 28 ? a : b; };
+// 가장 많은 오행이 '나'에게 어떤 쪽인지 — 많은 오행 ≠ 좋은 오행임을 설명
+const GRP_EFFECT = { 식상: '내 힘을 밖으로 빼 가는', 재성: '내 힘을 쓰게 만드는', 관성: '나를 누르는', 인성: '나를 길러 주는', 비겁: '나와 같은' };
 
 // ───────────────────────── 데이터 ─────────────────────────
 export const TENGOD_INFO = {
@@ -151,111 +156,107 @@ export function comprehensiveSummary(c) {
 
   // 신강약(기운 세기)
   const strongTxt = {
-    극신강: '기운이 한쪽으로 아주 강하게 쏠려 있습니다. 넘치는 힘을 밖으로 풀어내는 시기에 잘 풀립니다.',
+    극신강: '나를 받쳐주는 힘이 아주 강하게 쏠려 있습니다(극신강). 넘치는 힘을 밖으로 풀어내는 시기에 잘 풀립니다.',
     신강: '나를 받쳐주는 힘이 넉넉한 편입니다(신강). 주관과 추진력이 강하니, 가진 힘을 일·재능·베풂으로 쓰는 방향이 좋습니다.',
     중화: '받쳐주는 힘과 빼는 힘이 균형을 이룹니다(중화). 어떤 운이 와도 비교적 유연하게 적응합니다.',
     신약: '나를 받쳐주는 힘이 다소 부족한 편입니다(신약). 혼자보다 협력이 필요하고, 나를 도와주는 운이 올 때 크게 풀립니다.',
     극신약: '나를 받쳐주는 힘이 많이 부족합니다. 무리한 확장보다 내실·건강·귀인을 챙기는 편이 유리합니다.',
   };
-  lines.push(`기운의 세기는 <b>${st.level}</b>입니다. ${strongTxt[st.level]}`);
+  lines.push(`내 힘의 세기는 <b>${st.level}</b>입니다. ${strongTxt[st.level]}`);
 
-  // 용신(도움 기운)
-  let yLine = `나에게 가장 도움이 되는 기운은 <b>${ys.primary}(${ELEM_HANJA[ys.primary]})</b>, 그다음은 <b>${ys.helper}(${ELEM_HANJA[ys.helper]})</b>입니다. ${ys.reason}.`;
-  if (ys.johu) {
-    yLine += ys.johuUrgent
-      ? ` 또 한겨울/한여름에 태어나, <b>${ys.johu}(${ELEM_HANJA[ys.johu]})</b> 기운으로 추위·더위의 균형을 잡는 것이 특히 중요합니다.`
-      : ` 더해서 <b>${ys.johu}(${ELEM_HANJA[ys.johu]})</b> 기운이 있으면 계절의 균형이 맞아 더 좋습니다.`;
+  // 가장 많은 오행 vs 용신 — 서로 다른 판정임을 먼저 밝힌다
+  const H = e => `${e}(${ELEM_HANJA[e]})`;
+  const ec = c.elementCount || {};
+  const ecKeys = Object.keys(ec);
+  const maxEl = ecKeys.length ? ecKeys.sort((a, b) => ec[b] - ec[a])[0] : null;
+  let yLine = '';
+  if (maxEl && ec[maxEl] >= 3 && maxEl !== ys.primary) {
+    const grp = godGroupOfElement(c.dayStem, maxEl);
+    const eff = GRP_EFFECT[grp];
+    const isSupport = grp === '인성' || grp === '비겁';
+    if (eff && !ys.strong && !isSupport) yLine += `사주에는 <b>${H(maxEl)}</b>${jo(maxEl, '이', '가')} ${ec[maxEl]}개로 가장 많지만, ${maxEl}${jo(maxEl, '은', '는')} ${eff} 쪽이라 더 보태야 할 오행이 아닙니다. `;
+    else if (eff && ys.strong && isSupport) yLine += `사주에는 <b>${H(maxEl)}</b>${jo(maxEl, '이', '가')} ${ec[maxEl]}개로 가장 많고 ${eff} 쪽이라, 힘이 이미 넘치니 더 보태지 않습니다. `;
   }
-  yLine += ` 이 기운(${ys.primary}·${ys.helper})이 들어오는 시기가 인생의 좋은 기회입니다.`;
+
+  // 용신·희신
+  yLine += `균형을 잡아 줄 오행, 즉 용신은 <b>${H(ys.primary)}</b>, 이를 거드는 희신은 <b>${H(ys.helper)}</b>입니다. ${ys.reason}.`;
+  if (ys.johu) {
+    const season = ys.johu === '수' ? '더운 계절' : '추운 계절';
+    if (ys.johu === ys.primary || ys.johu === ys.helper) {
+      yLine += ` ${season}에 태어나 온도 균형인 조후로도 ${H(ys.johu)}${jo(ys.johu, '이', '가')} 필요하니, 이 처방은 더욱 확실합니다.`;
+    } else {
+      yLine += ys.johuUrgent
+        ? ` 또 ${season} 한복판에 태어나, <b>${H(ys.johu)}</b>로 추위·더위의 균형인 조후를 잡는 것도 특히 중요합니다.`
+        : ` 더해서 <b>${H(ys.johu)}</b>가 있으면 ${season}의 온도 균형이 맞아 더 좋습니다.`;
+    }
+  }
+  yLine += ` ${ys.primary}·${ys.helper}${jo(ys.helper, '이', '가')} 운으로 들어오는 시기가 인생의 좋은 기회입니다.`;
   lines.push(yLine);
 
-  // 가장 강한 기운
+  // 가장 두드러진 십성 그룹
   const groups = Object.entries(c.groupCount).sort((a, b) => b[1] - a[1]);
   const topGrp = groups[0];
   if (topGrp[1] >= 3) {
-    lines.push(`여러 기운 중 <b>${GRP_EASY[topGrp[0]]}</b>이(가) 가장 두드러집니다 — 이것이 인생을 이끄는 주된 힘입니다.`);
+    const g = GRP_EASY[topGrp[0]];
+    lines.push(`나와 글자들의 관계(십성)로 보면 <b>${g}</b>${jo(g, '이', '가')} 가장 두드러집니다 — 이것이 인생을 이끄는 주된 힘입니다.`);
   }
 
   // 없는 오행
   const zero = Object.entries(c.elementCount).filter(([, v]) => v === 0).map(([k]) => k);
-  if (zero.length) lines.push(`사주에 <b>${zero.map(z => z + ELEM_HANJA[z]).join('·')}</b> 기운은 겉으로 드러나 있지 않습니다. 이 기운이 맡는 부분은 운에서 채워질 때 비로소 살아납니다.`);
+  if (zero.length) lines.push(`사주 글자에 <b>${zero.map(H).join('·')}</b>${jo(zero[zero.length - 1], '은', '는')} 하나도 없습니다. 이 오행이 맡는 부분은 운에서 채워질 때 비로소 살아납니다.`);
 
   return lines;
 }
 
+// ───────────────────────── 판단 기록 → 문장 ─────────────────────────
+// 문장은 판단 기록(judgments.mjs)을 설명만 한다. 결론 → 근거 → 반대 근거 → 성립 조건 → 유보 순.
+const STAT_CLS = { 성립: 'ok', 조건부: 'cond', 보류: 'hold', 불성립: 'no' };
+export function fmtJudgment(j) {
+  const meta = [];
+  if (j.evidence.length) meta.push(`<span class="jm-k">근거</span> ${j.evidence.join(' · ')}`);
+  if (j.counter.length) meta.push(`<span class="jm-k">반대 근거</span> ${j.counter.join(' · ')}`);
+  if (j.conditions.length) meta.push(`<span class="jm-k">성립 조건</span> ${j.conditions.join(' · ')}`);
+  if (j.hold.length) meta.push(`<span class="jm-k">유보</span> ${j.hold.join(' · ')}`);
+  return `<span class="jstat jstat-${STAT_CLS[j.status]}">${j.status}</span> <b>${j.claim}</b>${meta.length ? `<div class="jmeta">${meta.map(m => `<div>${m}</div>`).join('')}</div>` : ''}`;
+}
+function judged(c) {
+  if (!c._judgments) c._judgments = buildJudgments(c);
+  return c._judgments;
+}
+
 // ───────────────────────── 재물운 ─────────────────────────
 export function wealthLuck(c) {
-  const g = c.groupCount, ys = c.yongsin, lines = [];
-  let s = 50;
-
-  if (g.재성 >= 2) { s += 16; lines.push('돈을 벌고 굴리는 감각(재물의 기운)이 발달했습니다. 돈에 대한 욕구와 현실 감각이 뚜렷합니다.'); }
-  else if (g.재성 === 1) { s += 6; lines.push('재물의 기운이 적당해서, 분수에 맞는 돈 관리가 잘 됩니다.'); }
-  else { s -= 6; lines.push('돈을 직접 좇기보다 명예·전문성으로 가치를 쌓는 편이 유리합니다. 재물 운이 들어오는 시기에 기회가 열립니다.'); }
-
-  if (g.식상 >= 1 && g.재성 >= 1) { s += 12; lines.push('재능을 발휘하면 그게 자연스럽게 수입으로 이어지는 좋은 짜임새입니다.'); }
-  if (ys.strong && g.재성 >= 1) { s += 10; lines.push('기운이 든든해서 돈을 감당할 그릇이 충분합니다. 적극적으로 재물을 추구해도 좋습니다.'); }
-  if (!ys.strong && g.재성 >= 2) { s -= 12; lines.push('돈 들어올 자리는 많은데 그걸 감당할 내 힘이 부족한 편입니다. 욕심내기보다 건강과 협력자를 먼저 챙기세요.'); }
-  if (g.비겁 >= 3) { s -= 8; lines.push('나와 비슷한 기운이 강해, 재물을 두고 경쟁·분배가 생기기 쉽습니다. 동업·보증·공동투자는 신중해야 합니다.'); }
-  if (godGroupOfElement(c.dayStem, ys.primary) === '재성' || TENGOD_GROUP[c.gyeokguk.baseGod] === '재성') s += 6;
-
-  if (c.godCount.편재 > c.godCount.정재 && c.godCount.편재 >= 1) lines.push('사업·투자처럼 크게 움직이는 돈(편재)에 인연이 있습니다.');
-  else if (c.godCount.정재 >= 1) lines.push('월급·임대처럼 꾸준하고 안정적인 돈(정재)에 강합니다.');
-
-  const cur = c.daeun.list[c.daeun.currentIdx];
-  if (cur && (TENGOD_GROUP[cur.stemGod] === '재성' || TENGOD_GROUP[cur.branchGod] === '재성')) {
-    s += 8; lines.push(`지금의 큰 운(${gz(cur.stem, cur.branch)})에 재물의 기운이 들어와, 돈 관련 활동이 활발해지는 시기입니다.`);
-  }
-  s = clamp(s);
-  return { score: s, grade: grade(s), lines };
+  const js = judged(c).wealth;
+  const s = clamp(scoreOf(js, 50));
+  return { score: s, grade: grade(s), lines: js.map(fmtJudgment), judgments: js };
 }
 
 // ───────────────────────── 직업운 ─────────────────────────
 export function careerLuck(c) {
-  const g = c.groupCount, lines = [];
-  let s = 52;
+  const js = judged(c).career.slice();
   const gg = c.gyeokguk;
-  lines.push(`타고난 그릇은 <b>${gg.name}</b> — ${GYEOKGUK_INFO[gg.name] || ''}`);
-
-  if (g.관성 >= 1 && g.인성 >= 1) { s += 14; lines.push('직장운(명예·책임)과 공부운(배움·문서)이 서로 받쳐주는 좋은 짜임새라, 조직·공직·자격이 필요한 일에서 안정적으로 성장합니다.'); }
-  if (g.식상 >= 2) { s += 10; lines.push('재능을 펼치는 기운이 강해, 기술·창작·교육·전문서비스처럼 내 능력을 직접 보여주는 일이 잘 맞습니다.'); }
-  if (g.관성 >= 2) { s += 8; lines.push('명예·책임의 기운이 강해 조직·관리 직무에 어울리나, 책임과 압박을 잘 다스려야 합니다.'); }
-  if (g.재성 >= 2) { s += 8; lines.push('재물·활동의 기운이 강해 사업·영업·금융처럼 성과가 눈에 보이는 일에 강합니다.'); }
-  if (g.관성 === 0 && g.재성 === 0) { s -= 6; lines.push('조직 생활보다 전문성·기술·연구로 홀로 서는 길이 더 유리할 수 있습니다.'); }
-
+  const g0 = js.find(j => j.id === 'gyeok');
+  if (g0 && GYEOKGUK_INFO[gg.name]) g0.claim = `타고난 그릇(격국)은 ${gg.name} — ${GYEOKGUK_INFO[gg.name]}`;
+  // 참고: 개수 최다 십성 — 세력 판단이 아니라 단순 개수라 점수에 넣지 않음
   const topGod = Object.entries(c.godCount).sort((a, b) => b[1] - a[1])[0];
-  if (topGod[1] >= 1) lines.push(`잘 맞는 분야: <b>${godEasy(topGod[0])}</b>의 기운이 강해 「${TENGOD_INFO[topGod[0]].job}」과(와) 인연이 깊습니다.`);
-
-  s = clamp(s);
-  return { score: s, grade: grade(s), lines };
+  if (topGod && topGod[1] >= 1) js.push({
+    id: 'top_god', claim: `잘 맞는 분야(참고): ${godEasy(topGod[0])}의 기운 → 「${TENGOD_INFO[topGod[0]].job}」`, delta: 0, status: '보류',
+    evidence: [`${topGod[0]} ${topGod[1]}개 (천간·지지 본기 개수 최다)`], counter: [], conditions: [], hold: ['개수 기준이라 위 세력 판단과 다를 수 있음 — 세력 기준 항목을 우선', ...(c.input && c.input.hourUnknown ? ['시각 미상: 시주를 뺀 3주 기준'] : [])],
+  });
+  const s = clamp(scoreOf(js, 52));
+  return { score: s, grade: grade(s), lines: js.map(fmtJudgment), judgments: js };
 }
 
 // ───────────────────────── 연애·결혼운 ─────────────────────────
 export function loveLuck(c) {
-  const male = c.gender === 'male';
-  const spouseGrp = male ? '재성' : '관성';
-  const spouseName = male ? '이성(여성)을 뜻하는 기운' : '이성(남성)을 뜻하는 기운';
-  const g = c.groupCount, lines = [];
-  let s = 50;
-
-  if (g[spouseGrp] >= 1 && g[spouseGrp] <= 2) { s += 14; lines.push(`${spouseName}이 알맞게 자리해, 이성 인연과 배우자 복이 무난합니다.`); }
-  else if (g[spouseGrp] >= 3) { s += 4; lines.push(`${spouseName}이 다소 많아 이성 인연은 풍부하지만, 관계가 복잡해지지 않게 한 사람에게 집중하는 노력이 필요합니다.`); }
-  else { s -= 8; lines.push(`${spouseName}이 약한 편이라 인연이 늦거나 적극적으로 다가가야 합니다. 그 기운이 들어오는 시기에 인연이 활발해집니다.`); }
-
-  const dayBranchGod = c.pillarInfo.day.branchGod;
-  lines.push(`배우자 자리(일지)는 <b>${BRANCH_KO[c.pillarInfo.day.branch]}(${c.pillarInfo.day.branch})</b>이고 그 기운은 <b>${godEasy(dayBranchGod)}</b>이라서, 「${TENGOD_INFO[dayBranchGod]?.key || ''}」 사람과 인연이 깊습니다.`);
-
-  const dohwa = c.sinsal.find(x => x.name === '도화살');
-  if (dohwa) { s += 6; lines.push('이성에게 끌리는 매력과 인기가 있습니다(도화살). 매력으로 잘 쓰면 좋지만, 괜한 구설은 조심하세요.'); }
-
-  if (male && g.비겁 >= 3) { s -= 6; lines.push('나와 비슷한 기운이 강해 이성을 두고 경쟁이 생기기 쉬우니, 삼각관계·금전 얽힘을 주의하세요.'); }
-  if (!male && g.식상 >= 3) { s -= 6; lines.push('표현·재능의 기운이 강해 배우자(남성)와 부딪히기 쉬우니, 기대치를 낮추고 배려하는 태도가 관계를 부드럽게 합니다.'); }
-
-  const cur = c.daeun.list[c.daeun.currentIdx];
-  if (cur && (TENGOD_GROUP[cur.stemGod] === spouseGrp || TENGOD_GROUP[cur.branchGod] === spouseGrp)) {
-    s += 8; lines.push(`지금의 큰 운(${gz(cur.stem, cur.branch)})에 이성의 기운이 들어와, 인연·결혼·관계 변화가 활발한 시기입니다.`);
+  const js = judged(c).love.slice();
+  const p = js.find(j => j.id === 'spouse_palace');
+  if (p) {
+    const dayBranchGod = c.pillarInfo.day.branchGod;
+    p.claim = `배우자 자리(일지)는 ${BRANCH_KO[c.pillarInfo.day.branch]}(${c.pillarInfo.day.branch}), 그 기운은 ${godEasy(dayBranchGod)} — 「${TENGOD_INFO[dayBranchGod]?.key || ''}」 사람과 인연`;
   }
-  s = clamp(s);
-  return { score: s, grade: grade(s), lines };
+  const s = clamp(scoreOf(js, 50));
+  return { score: s, grade: grade(s), lines: js.map(fmtJudgment), judgments: js };
 }
 
 // ───────────────────────── 건강운 ─────────────────────────
@@ -268,8 +269,9 @@ export function healthLuck(c) {
   const total = Object.values(dist).reduce((a, b) => a + b, 0);
 
   const spread = maxE[1] - minE[1];
-  if (spread <= 1.6) { s += 10; lines.push('다섯 기운(오행)이 비교적 고르게 갖춰져, 기본 체질이 균형 잡힌 편입니다.'); }
-  else { s -= 8; lines.push('기운이 한쪽으로 치우쳐 있어, 강한 기운과 약한 기운에 해당하는 몸의 균형 관리가 필요합니다.'); }
+  const distTxt = entries.map(([k, v]) => `${k} ${v.toFixed(1)}`).join(' · ');
+  if (spread <= 1.6) { s += 10; lines.push(`다섯 기운(오행)이 비교적 고르게 갖춰져, 기본 체질이 균형 잡힌 편입니다. <span class="jm-k">근거</span> 최대-최소 차 ${spread.toFixed(1)} (${distTxt})`); }
+  else { s -= 8; lines.push(`기운이 한쪽으로 치우쳐 있어, 강한 기운과 약한 기운에 해당하는 몸의 균형 관리가 필요합니다. <span class="jm-k">근거</span> 최대-최소 차 ${spread.toFixed(1)} (${distTxt})`); }
 
   if (maxE[1] >= total * 0.34) lines.push(`<b>${maxE[0]}(${ELEM_HANJA[maxE[0]]})</b> 기운이 너무 강합니다 — ${ELEM_INFO[maxE[0]].excess}에 유의하세요. (관련: ${ELEM_INFO[maxE[0]].organ})`);
   const zeroElems = Object.entries(c.elementCount).filter(([, v]) => v === 0).map(([k]) => k);
@@ -332,7 +334,7 @@ export function futureReading(c) {
   }
   if (next) {
     lines.push(`<b>다음 큰 운: ${next.age}~${next.endAge}세</b> (${gz(next.stem, next.branch)}) · 기운 ${next.fortune.level} ${next.fortune.mark}`);
-    lines.push(`${next.age}세 무렵 인생의 무대가 한 번 더 바뀝니다. ${godTheme(next.stemGod)}`);
+    lines.push(`${next.age}세(${next.startYM}) 무렵 인생의 무대가 한 번 더 바뀝니다. ${godTheme(next.stemGod)}`);
   }
   const goodYears = c.seun.filter(s => s.fortune.score >= 1).map(s => s.year);
   const badYears = c.seun.filter(s => s.fortune.score <= -1).map(s => s.year);

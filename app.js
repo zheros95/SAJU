@@ -1,9 +1,9 @@
-import { buildChart } from './saju_engine.mjs?v=12';
-import * as T from './saju_text.mjs?v=12';
+import { buildChart } from './saju_engine.mjs?v=14';
+import * as T from './saju_text.mjs?v=15';
 import { dayMasterDescriptions } from './saju_descriptions.mjs?v=10';
-import { PALM_QUESTIONS, readPalmistry, detectHandType } from './palmistry.mjs?v=7';
-import { readIntegration } from './integration.mjs?v=3';
-import { annotate, easySummaryCard } from './glossary.mjs?v=2';
+import { PALM_QUESTIONS, readPalmistry, detectHandType } from './palmistry.mjs?v=8';
+import { readIntegration } from './integration.mjs?v=5';
+import { annotate, easySummaryCard } from './glossary.mjs?v=3';
 
 // ───────── 오행 색상 ─────────
 const ELEM_COLOR = { 목: '#5cc46a', 화: '#f0584b', 토: '#e0a93a', 금: '#e8ebef', 수: '#4aa3f0' };
@@ -106,7 +106,7 @@ let _palmSurveyReady = false;
 function ensurePalmSurvey() {
   if (_palmSurveyReady) return;
   const html = `<div class="palm-survey">
-    <p class="mini-note">손 모양은 사진에서 <b>자동 판별</b>돼. 손금·문양은 사진을 보며 골라줘 — <b>모르는 항목은 비워 두면 해석에서 빠져</b>(멋대로 좋게 해석하지 않아).</p>
+    <p class="mini-note">손 모양은 사진에서 <b>자동 판별</b>돼. 손금·문양은 사진을 보며 골라줘 — <b>'모르겠다'나 빈 항목은 '없다'로 보지 않고 판단 보류</b>로 처리해.</p>
     <p id="hand-auto-status" class="hand-auto-status hidden"></p>
     ${PALM_QUESTIONS.map(q => `
       <div class="form-group palm-q" data-qid="${q.id}">
@@ -483,21 +483,25 @@ function renderSusangTab(palm) {
 function renderIntegrationTab(intg) {
   const chips = Object.entries(intg.els).map(([k, v]) =>
     `<span class="badge"><i class="fas fa-circle-half-stroke"></i> ${k} ${v}</span>`).join('');
-  const title = intg.hasSaju ? '통합 사주 — 종합 통변' : `${(intg.srcNames || []).join('·')} 통합 분석`;
-  const noteTxt = intg.hasSaju
-    ? '전통 사주(命)를 중심에 두고 관상·수상을 오행으로 엮은 종합 인물평입니다.'
-    : `${(intg.srcNames || []).join('·')}를 오행으로 엮은 종합 해석입니다. (사주까지 입력하면 더 입체적입니다)`;
+  const title = `${(intg.srcNames || []).join('·')} 나란히 보기`;
+  const srcRows = (intg.sources || []).map(s => `<tr><th>${s.name}</th><td>${s.conclusion}</td><td>${s.basis}</td><td class="dim-text">${s.limits}</td></tr>`).join('');
+  const srcTable = srcRows ? `<div class="table-wrap"><table class="cmp-table"><thead><tr><th>체계</th><th>결론</th><th>근거</th><th>한계</th></tr></thead><tbody>${srcRows}</tbody></table></div>` : '';
+  const vCls = { '일치': 'good', '상충': 'warn', '판단 불가': '' };
+  const cmpRows = (intg.compare || []).map(c => `<tr><td>${c.topic}</td><td>${c.a || '—'}</td><td>${c.b || '—'}</td><td><span class="badge ${vCls[c.verdict] || ''}">${c.verdict}</span></td></tr>`).join('');
+  const cmpTable = cmpRows ? `<h3>비교</h3><div class="table-wrap"><table class="cmp-table"><thead><tr><th>항목</th><th>앞</th><th>뒤</th><th>판정</th></tr></thead><tbody>${cmpRows}</tbody></table></div>` : '';
   const head = `<div class="card integration-card">
     <h2><i class="fas fa-circle-nodes"></i> ${title}</h2>
-    <p class="mini-note">${noteTxt}</p>
+    <p class="mini-note">각 체계의 결론과 근거를 따로 보여 줍니다. 하나의 오행으로 합치지 않습니다.</p>
     <div class="badges">${chips}</div>
+    ${srcTable}
+    ${cmpTable}
     <div class="prose">${intg.lines.map(l => `<p>${l}</p>`).join('')}</div>
   </div>`;
   const secs = (intg.sections || []).map(s => `<div class="card">
     <h2><i class="fas ${s.icon}"></i> ${s.title}</h2>
     <div class="prose"><p>${s.body}</p></div>
   </div>`).join('');
-  const disc = `<p class="disclaimer">통합 해석은 사주(命)를 중심에 두고 관상·수상을 보조로 엮은 <b>참고용</b>입니다. 운명은 정해진 것이 아니라 개척하는 것이며, 관상·수상은 통계적으로 검증된 학문이 아닙니다.</p>`;
+  const disc = `<p class="disclaimer">사주·관상·수상은 통계적으로 검증된 학문이 아닙니다. 관상·수상의 오행은 이 앱의 대응표에서 나온 값이라, 사주와 같아도 독립된 교차검증이 아닙니다.</p>`;
   return head + secs + disc;
 }
 
@@ -636,7 +640,15 @@ function mingsikTable(c) {
     </div>`;
   }).join('');
   let note = c.input.hourUnknown ? `<p class="mini-note">※ 태어난 시간을 몰라 <b>시주(時柱)는 표시만 하고, 아래 모든 해석(오행·신강약·용신·운세)은 시주를 뺀 3주(三柱) 기준</b>으로 계산했습니다. 정확한 출생 시각을 알면 더 정밀해집니다.</p>` : '';
-  if (c.termWarning != null) note += `<p class="mini-note warn-note">⚠️ 출생 시각이 절기 경계에서 약 <b>${c.termWarning}분</b> 거리입니다. 절입시각 계산 오차(±수 분)로 년주·월주가 달라질 수 있으니, 중요한 판단에는 정밀 만세력 대조를 권합니다.</p>`;
+  if (c.hourSensitivity) {
+    const label = { strength: '신강약', yongsin: '용신', gyeokguk: '격국' };
+    const rows = Object.entries(c.hourSensitivity).map(([k, v]) => {
+      const dist = v.values.map(x => `${x.value} ${x.count}`).join(' · ');
+      return `<li><b>${label[k]}</b>: ${v.stable ? `<span class="badge good">유지</span> ${v.base}` : `<span class="badge warn">시각에 따라 바뀜</span> 3주 기준 ${v.base} / 12개 시주 대입 시 ${dist}`}</li>`;
+    }).join('');
+    note += `<div class="mini-note"><b>시각 미상 검사</b> — 12개 시주를 모두 대입해 결론이 유지되는지 봤습니다.<ul class="luck-lines">${rows}</ul>'시각에 따라 바뀜'인 결론은 단정하지 마세요.</div>`;
+  }
+  if (c.termWarning != null) note += `<p class="mini-note warn-note">⚠️ 출생 시각이 절기 경계에서 약 <b>${c.termWarning}분</b> 거리입니다. 절입시각 계산은 한국천문연구원 자료와 1분 이내로 맞췄지만, 출생 시각 기록의 오차만으로도 년주·월주가 달라질 수 있습니다.</p>`;
   if (c.termDayWarning) note += `<p class="mini-note warn-note">⚠️ 이날은 <b>절기(입춘 등) 당일</b>입니다. 출생 시간을 모르면 년주·월주 자체가 달라질 수 있어, 여기서는 정오 기준으로 표시했습니다. 출생 시각을 확인해 다시 보길 권합니다.</p>`;
   if (c.tzHalf) note += `<p class="mini-note">※ 출생 시기의 한국 표준시(UTC+8:30)를 현행 기준으로 자동 보정했습니다(+30분). 단, 서머타임 시행 시기는 반영되지 않습니다.</p>`;
   return `<div class="card"><h2><i class="fas fa-table-cells"></i> 사주 명식 (四柱八字)</h2>
@@ -694,7 +706,7 @@ function renderLuckTab(c) {
     ['연애·결혼운', 'fa-heart', T.loveLuck(c)],
     ['건강운', 'fa-heart-pulse', T.healthLuck(c)],
   ];
-  const scoreNote = `<p class="mini-note">점수는 전통 명리의 공식이 아니라 <b>이 앱의 규칙으로 매긴 상대 지표</b>입니다. 숫자 자체보다 항목별 설명을 참고하세요.</p>`;
+  const scoreNote = `<p class="mini-note">각 항목은 <b>결론 → 근거 → 반대 근거 → 성립 조건 → 유보</b> 순으로 적었습니다. <span class="jstat jstat-ok">성립</span> 근거가 갖춰짐 · <span class="jstat jstat-cond">조건부</span> 반대 근거가 있어 조건이 붙음 · <span class="jstat jstat-hold">보류</span> 판단하지 않음 · <span class="jstat jstat-no">불성립</span> 글자는 있으나 작용하지 않음. 점수는 성립 항목만 전액, 조건부는 절반 반영한 <b>이 앱의 상대 지표</b>입니다.</p>`;
   const healthNote = `<p class="disclaimer">건강운은 오행 균형에 대한 <b>전통적 관점의 참고</b>일 뿐, 의학적 진단·예측이 아닙니다. 건강 이상은 반드시 의료 전문가와 상담하세요.</p>`;
   return scoreNote + items.map(([title, icon, r]) => `
     <div class="card luck-card">
@@ -740,14 +752,14 @@ function daeunTimeline(c) {
     const cur = i === c.daeun.currentIdx;
     const pastCls = i < c.daeun.currentIdx ? 'past' : '';
     return `<div class="tl-cell f-${d.fortune.level} ${cur ? 'current' : ''} ${pastCls}">
-      <div class="tl-age">${d.age}세</div>
+      <div class="tl-age">${d.age}세<br><small>${d.startYM}~</small></div>
       <div class="tl-gz"><span style="color:${colorOf(d.stem)}">${d.stem}</span><span style="color:${colorOf(d.branch)}">${d.branch}</span></div>
       <div class="tl-god">${d.stemGod}<br>${d.branchGod}</div>
       <div class="tl-mark">${d.fortune.mark}</div>
     </div>`;
   }).join('');
   const se = c.daeun.startExact;
-  const startTxt = se ? ` · 대운 교체 시점: 약 ${se.years}세 ${se.months}개월(표에는 반올림 나이로 표시)` : '';
+  const startTxt = se ? ` · 첫 대운 교체: 생후 ${se.years}년 ${se.months}개월(${se.ym}), 이후 10년마다. 나이는 교체일 기준 만 나이` : '';
   return `<div class="timeline">${cells}</div>
     <p class="legend">◎대길 ○길 –평 △주의 ✕흉 · <span class="now-dot"></span>현재 대운${startTxt}</p>`;
 }
