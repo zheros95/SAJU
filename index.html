@@ -206,9 +206,10 @@
     if ('serviceWorker' in navigator && location.hostname !== 'localhost' && location.hostname !== '127.0.0.1') {
       window.addEventListener('load', () => navigator.serviceWorker.register('service-worker.js').catch(() => {}));
       // 새 버전 서비스워커가 제어권을 잡으면 한 번 새로고침 — 홈화면 앱을 두 번 껐다 켜야 갱신되던 문제 해결
+      const hadController = !!navigator.serviceWorker.controller; // 최초 설치는 새로고침 불필요
       let reloaded = false;
       navigator.serviceWorker.addEventListener('controllerchange', () => {
-        if (reloaded || !navigator.serviceWorker.controller) return;
+        if (!hadController || reloaded) return;
         reloaded = true;
         location.reload();
       });
