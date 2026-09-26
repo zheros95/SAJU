@@ -46,9 +46,10 @@ function updateMinuteState(sfx) {
 }
 
 function populatePerson(sfx) {
-  const years = [{ v: '', t: '태어난 해', disabled: true, sel: true }];
+  // 최신 연도가 맨 위, 기본 선택은 1980년(피커가 1980년 근처에서 열리도록)
+  const years = [];
   const nowY = new Date().getFullYear();
-  for (let y = 1930; y <= nowY; y++) years.push({ v: y, t: y + '년' });
+  for (let y = nowY; y >= 1930; y--) years.push({ v: y, t: y + '년', sel: y === 1980 });
   setOptions(byId('birth-year' + sfx), years);
 
   const months = [{ v: '', t: '월', disabled: true, sel: true }];
