@@ -306,35 +306,31 @@ document.getElementById('reset-btn').addEventListener('click', () => {
   window.scrollTo(0, 0);
 });
 
-// 결과를 PNG 이미지로 저장 — 폰 화면 비율의 여러 장으로 나눠 저장
-// 한 장으로 길게 찍으면 사진 앱에서 글씨가 너무 작아지므로, 폰 폭(420px)으로 맞춘 뒤
-// 카드 경계에서 끊어 9:16 안팎의 페이지로 만든다. iOS는 download 링크를 무시하므로
-// 미리보기 시트에서 공유 시트(사진에 저장)로 넘긴다.
-const CAPTURE_W = 420;            // 캡처 폭(CSS px) — 폰 화면 폭
-const PAGE_MAX_H = CAPTURE_W * 2.05; // 페이지 최대 높이(아이폰 화면 비율 근처)
-const CAPTURE_SCALE = 3;          // 1260px 폭 이미지
+// 결과를 PDF 한 파일로 저장
+// 폰 폭(420px)으로 맞춘 화면을 A4 비율로 끊어 쪽마다 넣는다. 끊는 위치는 카드 경계 → 문단 경계 순으로 찾는다.
+// iOS 홈화면 앱은 download 링크를 무시하므로 공유 시트(파일에 저장)로 넘긴다.
+const CAPTURE_W = 420;               // 캡처 폭(CSS px) — 폰 화면 폭
+const A4_RATIO = 297 / 210;
+const PAGE_MAX_H = Math.floor(CAPTURE_W * A4_RATIO);
+const CAPTURE_SCALE = 3;             // 1260px 폭 → A4에서 약 150dpi
 
 function pageBreaks(root) {
   const top0 = root.getBoundingClientRect().top;
   const total = root.scrollHeight;
-  // 최상위 블록(중첩 카드 제외)의 시작 위치를 끊을 후보로
-  const blocks = [...root.querySelectorAll('header, .card, .easy-card, .tab-panel > *, #couple-result > *')]
-    .filter(el => el.offsetHeight > 0 && !el.parentElement.closest('.card'));
-  const cuts = [...new Set(blocks.map(el => Math.round(el.getBoundingClientRect().top - top0 - 8)))]
+  const tops = sel => [...new Set([...root.querySelectorAll(sel)]
+    .filter(el => el.offsetHeight > 0)
+    .map(el => Math.round(el.getBoundingClientRect().top - top0 - 6)))]
     .filter(y => y > 0 && y < total).sort((x, y) => x - y);
+  const major = tops('header, .card, .tab-panel > *, #couple-result > *');               // 카드 경계
+  const minor = tops('.card p, .card li, .card tr, .card h3, .card h4, .card .jmeta, .card > div > div'); // 문단 경계
   const pages = [];
   let start = 0;
   while (start < total - 4) {
     const limit = start + PAGE_MAX_H;
     if (limit >= total) { pages.push([start, total]); break; }
-    const fit = cuts.filter(c => c > start + 40 && c <= limit);
-    let end;
-    if (fit.length) end = fit[fit.length - 1];
-    else {
-      const next = cuts.find(c => c > start + 40);
-      end = next && next - start <= PAGE_MAX_H * 1.5 ? next : limit; // 긴 카드는 조금 길게 허용, 그래도 길면 자름
-    }
-    pages.push([start, Math.min(end, total)]);
+    const pick = list => list.filter(c => c > start + PAGE_MAX_H * 0.45 && c <= limit).pop();
+    const end = pick(major) || pick(minor) || limit;
+    pages.push([start, end]);
     start = end;
   }
   return pages;
@@ -346,113 +342,135 @@ const noAnim = doc => {
   doc.head.appendChild(st);
 };
 
+// 페이지 이미지(JPEG dataURL) 목록
 async function renderPages(root) {
   const r = root.getBoundingClientRect();
   const pages = pageBreaks(root);
-  // 페이지들을 캔버스 한도(약 1,600만 픽셀) 안의 덩어리로 묶어 한 번에 그린 뒤 잘라낸다
-  const chunkMaxH = Math.floor(15e6 / (r.width * CAPTURE_SCALE * CAPTURE_SCALE));
+  const chunkMaxH = Math.floor(15e6 / (r.width * CAPTURE_SCALE * CAPTURE_SCALE)); // 캔버스 한도 안에서 묶어 렌더
   const chunks = [];
   pages.forEach(p => {
     const c = chunks[chunks.length - 1];
     if (c && p[1] - c.s <= chunkMaxH) { c.e = p[1]; c.pages.push(p); }
     else chunks.push({ s: p[0], e: p[1], pages: [p] });
   });
-  const blobs = [];
-  let idx = 0;
+  const out = [];
   for (const ch of chunks) {
     const big = await window.html2canvas(root, {
       backgroundColor: '#0b0c10', scale: CAPTURE_SCALE, useCORS: true, onclone: noAnim,
-      x: 0, y: ch.s, width: r.width, height: ch.e - ch.s, // html2canvas의 x·y는 대상 요소 기준 오프셋
+      x: 0, y: ch.s, width: r.width, height: ch.e - ch.s, // x·y는 대상 요소 기준 오프셋
     });
     for (const [s, e] of ch.pages) {
-      idx++;
       const sy = Math.round((s - ch.s) * CAPTURE_SCALE);
       const h = Math.min(Math.round((e - s) * CAPTURE_SCALE), big.height - sy);
       const canvas = document.createElement('canvas');
       canvas.width = big.width; canvas.height = h;
-      const ctx = canvas.getContext('2d');
-      ctx.drawImage(big, 0, sy, big.width, h, 0, 0, big.width, h);
-      if (pages.length > 1) {
-        ctx.font = `${12 * CAPTURE_SCALE}px sans-serif`;
-        ctx.fillStyle = 'rgba(232,230,223,.55)';
-        ctx.textAlign = 'right';
-        ctx.fillText(`${idx} / ${pages.length}`, canvas.width - 14 * CAPTURE_SCALE, canvas.height - 8 * CAPTURE_SCALE);
-      }
-      blobs.push(await new Promise((res, rej) => canvas.toBlob(b => b ? res(b) : rej(new Error('toBlob 실패')), 'image/png')));
+      canvas.getContext('2d').drawImage(big, 0, sy, big.width, h, 0, 0, big.width, h);
+      out.push({ data: canvas.toDataURL('image/jpeg', 0.88), w: canvas.width, h });
     }
-    big.width = big.height = 0; // 메모리 해제
+    big.width = big.height = 0;
   }
-  return blobs;
+  return out;
 }
 
-function showImageSheet(blobs, base) {
-  const n = blobs.length;
-  const names = blobs.map((_, i) => n > 1 ? `${base}_${String(i + 1).padStart(2, '0')}.png` : `${base}.png`);
-  const urls = blobs.map(b => URL.createObjectURL(b));
-  const files = blobs.map((b, i) => new File([b], names[i], { type: 'image/png' }));
-  const canShare = !!(navigator.canShare && navigator.canShare({ files }));
+function loadScript(src) {
+  return new Promise((res, rej) => {
+    const s = document.createElement('script');
+    s.src = src; s.onload = res; s.onerror = () => rej(new Error('스크립트 로드 실패: ' + src));
+    document.head.appendChild(s);
+  });
+}
+async function ensureJsPDF() {
+  if (!window.jspdf) await loadScript('https://cdnjs.cloudflare.com/ajax/libs/jspdf/2.5.1/jspdf.umd.min.js');
+  return window.jspdf.jsPDF;
+}
+
+async function buildPdf(imgs) {
+  const JsPDF = await ensureJsPDF();
+  const W = 210, H = 297;
+  const pdf = new JsPDF({ unit: 'mm', format: 'a4', compress: true });
+  imgs.forEach((im, i) => {
+    if (i) pdf.addPage();
+    pdf.setFillColor(11, 12, 16);
+    pdf.rect(0, 0, W, H, 'F');
+    const h = Math.min(H, W * im.h / im.w);
+    pdf.addImage(im.data, 'JPEG', 0, 0, W, h, undefined, 'FAST');
+    pdf.setFontSize(8);
+    pdf.setTextColor(150, 150, 150);
+    pdf.text(`${i + 1} / ${imgs.length}`, W - 8, H - 6, { align: 'right' });
+  });
+  return pdf.output('blob');
+}
+
+function showPdfSheet(blob, filename, pageCount) {
+  const url = URL.createObjectURL(blob);
+  const file = new File([blob], filename, { type: 'application/pdf' });
+  const canShare = !!(navigator.canShare && navigator.canShare({ files: [file] }));
+  const kb = Math.round(blob.size / 1024);
   const sheet = document.createElement('div');
-  sheet.className = 'img-sheet';
+  sheet.className = 'img-sheet pdf-sheet';
   sheet.innerHTML = `
     <div class="img-sheet-bar">
-      <span>${n}장으로 나눠 만들었어요${canShare ? ' · ‘사진에 저장’을 누르면 한 번에 저장' : ' · 길게 눌러 한 장씩 저장도 가능'}</span>
+      <span>PDF를 만들었어요</span>
       <button type="button" class="img-sheet-close" aria-label="닫기"><i class="fas fa-xmark"></i></button>
     </div>
-    <div class="img-sheet-body">${urls.map((u, i) => `<img src="${u}" alt="결과 이미지 ${i + 1}/${n}">`).join('')}</div>
+    <div class="pdf-sheet-body">
+      <i class="fas fa-file-pdf"></i>
+      <div class="pdf-name">${filename}</div>
+      <div class="pdf-meta">${pageCount}쪽 · ${kb >= 1024 ? (kb / 1024).toFixed(1) + 'MB' : kb + 'KB'}</div>
+      <p class="pdf-hint">${canShare ? '‘저장 / 공유’를 누른 뒤 <b>파일에 저장</b>을 고르면 됩니다. 카카오톡·메일로 바로 보낼 수도 있어요.' : '‘다운로드’를 누르면 다운로드 폴더에 저장됩니다.'}</p>
+    </div>
     <div class="img-sheet-btns">
-      ${canShare ? `<button type="button" class="submit-btn img-sheet-share"><i class="fas fa-arrow-up-from-bracket"></i> 사진에 저장 (${n}장)</button>` : ''}
-      <button type="button" class="submit-btn outline-btn img-sheet-dl"><i class="fas fa-download"></i> 다운로드</button>
+      ${canShare ? '<button type="button" class="submit-btn img-sheet-share"><i class="fas fa-arrow-up-from-bracket"></i> 저장 / 공유</button>' : ''}
+      <a class="submit-btn outline-btn img-sheet-dl" href="${url}" download="${filename}" target="_blank" rel="noopener"><i class="fas fa-${canShare ? 'eye' : 'download'}"></i> ${canShare ? '미리보기' : '다운로드'}</a>
     </div>`;
-  const close = () => { sheet.remove(); document.body.classList.remove('no-scroll'); setTimeout(() => urls.forEach(u => URL.revokeObjectURL(u)), 60000); };
+  const close = () => { sheet.remove(); document.body.classList.remove('no-scroll'); setTimeout(() => URL.revokeObjectURL(url), 60000); };
   sheet.querySelector('.img-sheet-close').addEventListener('click', close);
   sheet.addEventListener('click', e => { if (e.target === sheet) close(); });
   const shareBtn = sheet.querySelector('.img-sheet-share');
   if (shareBtn) shareBtn.addEventListener('click', async () => {
-    try { await navigator.share({ files }); }
-    catch (e) { if (e && e.name !== 'AbortError') alert('공유 시트를 열지 못했습니다. 이미지를 길게 눌러 저장해 주세요.'); }
-  });
-  sheet.querySelector('.img-sheet-dl').addEventListener('click', async () => {
-    for (let i = 0; i < n; i++) {
-      const a = document.createElement('a');
-      a.href = urls[i]; a.download = names[i];
-      document.body.appendChild(a); a.click(); a.remove();
-      await new Promise(r => setTimeout(r, 350)); // 연속 다운로드 차단 회피
-    }
+    try { await navigator.share({ files: [file], title: filename }); }
+    catch (e) { if (e && e.name !== 'AbortError') alert('공유 시트를 열지 못했습니다. 미리보기에서 공유 버튼으로 저장해 주세요.'); }
   });
   document.body.appendChild(sheet);
   document.body.classList.add('no-scroll');
 }
 
-async function saveAsImage(btn, base, prepare) {
-  if (!window.html2canvas) { alert('이미지 저장 모듈을 불러오지 못했습니다. 인터넷 연결을 확인해 주세요.'); return; }
+async function saveAsPdf(btn, base, prepare) {
+  if (!window.html2canvas) { alert('저장 모듈을 불러오지 못했습니다. 인터넷 연결을 확인해 주세요.'); return; }
   const orig = btn.innerHTML;
-  btn.innerHTML = '<i class="fas fa-spinner fa-spin"></i> 저장 중...';
+  btn.innerHTML = '<i class="fas fa-spinner fa-spin"></i> PDF 만드는 중...';
   btn.disabled = true;
   const restore = prepare();
-  document.body.classList.add('capture-mode');
   const scrollY = window.scrollY;
+  document.body.classList.add('capture-mode');
   void document.querySelector('.glass-container').offsetWidth; // 레이아웃 즉시 반영
   await new Promise(r => setTimeout(r, 30));
+  let imgs = null;
   try {
-    const blobs = await renderPages(document.querySelector('.glass-container'));
+    imgs = await renderPages(document.querySelector('.glass-container'));
+  } catch (e) {
+    console.error(e);
+  } finally {
     document.body.classList.remove('capture-mode');
     restore();
     window.scrollTo(0, scrollY);
-    showImageSheet(blobs, base);
+  }
+  try {
+    if (!imgs) throw new Error('캡처 실패');
+    const blob = await buildPdf(imgs);
+    showPdfSheet(blob, `${base}.pdf`, imgs.length);
   } catch (e) {
     console.error(e);
-    document.body.classList.remove('capture-mode');
-    restore();
-    alert('이미지 저장에 실패했습니다.');
+    alert('PDF 저장에 실패했습니다. 인터넷 연결을 확인해 주세요.');
   } finally {
     btn.innerHTML = orig;
     btn.disabled = false;
   }
 }
-const today = () => new Date().toISOString().slice(0, 10);
+const today = () => { const d = new Date(); return `${d.getFullYear()}-${String(d.getMonth() + 1).padStart(2, '0')}-${String(d.getDate()).padStart(2, '0')}`; };
 
 document.getElementById('save-btn').addEventListener('click', () => {
-  saveAsImage(document.getElementById('save-btn'), `사주명식_${today()}`, () => {
+  saveAsPdf(document.getElementById('save-btn'), `사주명식_${today()}`, () => {
     // 모든 탭을 펼쳐서 캡처
     const panels = [...document.querySelectorAll('.tab-panel')];
     const hiddenState = panels.map(p => p.classList.contains('hidden'));
@@ -477,7 +495,7 @@ document.getElementById('couple-reset-btn').addEventListener('click', () => {
 });
 
 document.getElementById('couple-save-btn').addEventListener('click', () => {
-  saveAsImage(document.getElementById('couple-save-btn'), `궁합_${today()}`, () => {
+  saveAsPdf(document.getElementById('couple-save-btn'), `궁합_${today()}`, () => {
     const btns = document.querySelector('#couple-result .result-btns');
     btns.style.display = 'none';
     return () => { btns.style.display = ''; };
@@ -509,7 +527,7 @@ function renderResults({ saju, face, palm, integration }) {
   document.getElementById('result-section').classList.remove('hidden');
 
   // 헤더·오늘 배너는 사주가 있을 때만 — 미사용 영역은 반드시 비움
-  // (이전 분석 내용이 남아 있으면 '이미지로 저장' 때 전체 펼침에 섞여 들어감)
+  // (이전 분석 내용이 남아 있으면 'PDF로 저장' 때 전체 펼침에 섞여 들어감)
   byId('result-head').classList.toggle('hidden', !saju);
   byId('today-banner').classList.toggle('hidden', !saju);
   if (saju) { renderHead(saju); renderToday(saju); }

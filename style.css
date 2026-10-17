@@ -561,3 +561,10 @@ body.no-scroll { overflow: hidden; }
 
 /* 이미지 저장 시 폰 폭으로 고정 */
 body.capture-mode .glass-container { width: 420px !important; max-width: 420px !important; padding: 1.6rem 1.1rem !important; box-shadow: none !important; transition: none !important; }
+
+/* PDF 저장 시트 */
+.pdf-sheet-body { flex: 1; display: flex; flex-direction: column; align-items: center; justify-content: center; padding: 1.5rem; text-align: center; color: #e8e6df; }
+.pdf-sheet-body .fa-file-pdf { font-size: 4rem; color: #e0b84a; margin-bottom: 1rem; }
+.pdf-name { font-weight: 600; font-size: 1.05rem; word-break: break-all; }
+.pdf-meta { opacity: .65; margin-top: .3rem; font-size: .9rem; }
+.pdf-hint { margin-top: 1.2rem; font-size: .9rem; line-height: 1.6; opacity: .85; max-width: 320px; }
