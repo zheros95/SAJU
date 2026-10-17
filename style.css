@@ -555,6 +555,9 @@ body.no-scroll { overflow: hidden; }
 .img-sheet-bar { display: flex; align-items: center; justify-content: space-between; padding: .8rem 1rem; padding-top: calc(.8rem + env(safe-area-inset-top)); color: #e8e6df; font-size: .9rem; }
 .img-sheet-close { background: none; border: 0; color: #e8e6df; font-size: 1.4rem; padding: .2rem .5rem; cursor: pointer; }
 .img-sheet-body { flex: 1; overflow: auto; -webkit-overflow-scrolling: touch; padding: 0 1rem; }
-.img-sheet-body img { display: block; width: 100%; height: auto; border-radius: 8px; }
+.img-sheet-body img { display: block; width: 100%; max-width: 520px; height: auto; margin: 0 auto 12px; border-radius: 8px; }
 .img-sheet-btns { display: flex; padding: .8rem 1rem; background: #0b0c10; border-top: 1px solid rgba(255,255,255,.08); padding-bottom: calc(.8rem + env(safe-area-inset-bottom)); }
 .img-sheet-btns .submit-btn { flex: 1; margin: 0 .4rem; text-align: center; text-decoration: none; }
+
+/* 이미지 저장 시 폰 폭으로 고정 */
+body.capture-mode .glass-container { width: 420px !important; max-width: 420px !important; padding: 1.6rem 1.1rem !important; box-shadow: none !important; transition: none !important; }

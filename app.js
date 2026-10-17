@@ -306,67 +306,144 @@ document.getElementById('reset-btn').addEventListener('click', () => {
   window.scrollTo(0, 0);
 });
 
-// 결과를 PNG 이미지로 저장
-// iOS(특히 홈화면 앱)는 download 링크를 무시하므로, 이미지를 만든 뒤 미리보기 창에서
-// 공유 시트(사진 저장) 또는 다운로드로 넘긴다. 캔버스는 iOS 한도(약 1,600만 픽셀) 아래로 맞춘다.
-const MAX_CANVAS_PX = 16e6;
-async function renderImage(root) {
-  const r = root.getBoundingClientRect();
-  const scale = Math.max(1, Math.min(2, Math.sqrt(MAX_CANVAS_PX / (r.width * r.height))));
-  const canvas = await window.html2canvas(root, {
-    backgroundColor: '#0b0c10', scale, useCORS: true,
-    // 복제 문서에서 fadeIn 애니메이션이 처음(opacity 0)부터 다시 시작돼 검게 찍히는 문제 방지
-    onclone: doc => {
-      const st = doc.createElement('style');
-      st.textContent = '*, *::before, *::after { animation: none !important; transition: none !important; }';
-      doc.head.appendChild(st);
-    },
-  });
-  const blob = await new Promise((res, rej) => canvas.toBlob(b => b ? res(b) : rej(new Error('toBlob 실패')), 'image/png'));
-  return blob;
+// 결과를 PNG 이미지로 저장 — 폰 화면 비율의 여러 장으로 나눠 저장
+// 한 장으로 길게 찍으면 사진 앱에서 글씨가 너무 작아지므로, 폰 폭(420px)으로 맞춘 뒤
+// 카드 경계에서 끊어 9:16 안팎의 페이지로 만든다. iOS는 download 링크를 무시하므로
+// 미리보기 시트에서 공유 시트(사진에 저장)로 넘긴다.
+const CAPTURE_W = 420;            // 캡처 폭(CSS px) — 폰 화면 폭
+const PAGE_MAX_H = CAPTURE_W * 2.05; // 페이지 최대 높이(아이폰 화면 비율 근처)
+const CAPTURE_SCALE = 3;          // 1260px 폭 이미지
+
+function pageBreaks(root) {
+  const top0 = root.getBoundingClientRect().top;
+  const total = root.scrollHeight;
+  // 최상위 블록(중첩 카드 제외)의 시작 위치를 끊을 후보로
+  const blocks = [...root.querySelectorAll('header, .card, .easy-card, .tab-panel > *, #couple-result > *')]
+    .filter(el => el.offsetHeight > 0 && !el.parentElement.closest('.card'));
+  const cuts = [...new Set(blocks.map(el => Math.round(el.getBoundingClientRect().top - top0 - 8)))]
+    .filter(y => y > 0 && y < total).sort((x, y) => x - y);
+  const pages = [];
+  let start = 0;
+  while (start < total - 4) {
+    const limit = start + PAGE_MAX_H;
+    if (limit >= total) { pages.push([start, total]); break; }
+    const fit = cuts.filter(c => c > start + 40 && c <= limit);
+    let end;
+    if (fit.length) end = fit[fit.length - 1];
+    else {
+      const next = cuts.find(c => c > start + 40);
+      end = next && next - start <= PAGE_MAX_H * 1.5 ? next : limit; // 긴 카드는 조금 길게 허용, 그래도 길면 자름
+    }
+    pages.push([start, Math.min(end, total)]);
+    start = end;
+  }
+  return pages;
 }
-function showImageSheet(blob, filename) {
-  const url = URL.createObjectURL(blob);
-  const file = new File([blob], filename, { type: 'image/png' });
-  const canShare = !!(navigator.canShare && navigator.canShare({ files: [file] }));
+
+const noAnim = doc => {
+  const st = doc.createElement('style');
+  st.textContent = '*, *::before, *::after { animation: none !important; transition: none !important; }';
+  doc.head.appendChild(st);
+};
+
+async function renderPages(root) {
+  const r = root.getBoundingClientRect();
+  const pages = pageBreaks(root);
+  // 페이지들을 캔버스 한도(약 1,600만 픽셀) 안의 덩어리로 묶어 한 번에 그린 뒤 잘라낸다
+  const chunkMaxH = Math.floor(15e6 / (r.width * CAPTURE_SCALE * CAPTURE_SCALE));
+  const chunks = [];
+  pages.forEach(p => {
+    const c = chunks[chunks.length - 1];
+    if (c && p[1] - c.s <= chunkMaxH) { c.e = p[1]; c.pages.push(p); }
+    else chunks.push({ s: p[0], e: p[1], pages: [p] });
+  });
+  const blobs = [];
+  let idx = 0;
+  for (const ch of chunks) {
+    const big = await window.html2canvas(root, {
+      backgroundColor: '#0b0c10', scale: CAPTURE_SCALE, useCORS: true, onclone: noAnim,
+      x: 0, y: ch.s, width: r.width, height: ch.e - ch.s, // html2canvas의 x·y는 대상 요소 기준 오프셋
+    });
+    for (const [s, e] of ch.pages) {
+      idx++;
+      const sy = Math.round((s - ch.s) * CAPTURE_SCALE);
+      const h = Math.min(Math.round((e - s) * CAPTURE_SCALE), big.height - sy);
+      const canvas = document.createElement('canvas');
+      canvas.width = big.width; canvas.height = h;
+      const ctx = canvas.getContext('2d');
+      ctx.drawImage(big, 0, sy, big.width, h, 0, 0, big.width, h);
+      if (pages.length > 1) {
+        ctx.font = `${12 * CAPTURE_SCALE}px sans-serif`;
+        ctx.fillStyle = 'rgba(232,230,223,.55)';
+        ctx.textAlign = 'right';
+        ctx.fillText(`${idx} / ${pages.length}`, canvas.width - 14 * CAPTURE_SCALE, canvas.height - 8 * CAPTURE_SCALE);
+      }
+      blobs.push(await new Promise((res, rej) => canvas.toBlob(b => b ? res(b) : rej(new Error('toBlob 실패')), 'image/png')));
+    }
+    big.width = big.height = 0; // 메모리 해제
+  }
+  return blobs;
+}
+
+function showImageSheet(blobs, base) {
+  const n = blobs.length;
+  const names = blobs.map((_, i) => n > 1 ? `${base}_${String(i + 1).padStart(2, '0')}.png` : `${base}.png`);
+  const urls = blobs.map(b => URL.createObjectURL(b));
+  const files = blobs.map((b, i) => new File([b], names[i], { type: 'image/png' }));
+  const canShare = !!(navigator.canShare && navigator.canShare({ files }));
   const sheet = document.createElement('div');
   sheet.className = 'img-sheet';
   sheet.innerHTML = `
     <div class="img-sheet-bar">
-      <span>${canShare ? '‘사진에 저장’ 또는 길게 눌러 저장' : '아래 버튼으로 저장하거나, 이미지를 길게 눌러 저장'}</span>
+      <span>${n}장으로 나눠 만들었어요${canShare ? ' · ‘사진에 저장’을 누르면 한 번에 저장' : ' · 길게 눌러 한 장씩 저장도 가능'}</span>
       <button type="button" class="img-sheet-close" aria-label="닫기"><i class="fas fa-xmark"></i></button>
     </div>
-    <div class="img-sheet-body"><img alt="분석 결과 이미지"></div>
+    <div class="img-sheet-body">${urls.map((u, i) => `<img src="${u}" alt="결과 이미지 ${i + 1}/${n}">`).join('')}</div>
     <div class="img-sheet-btns">
-      ${canShare ? '<button type="button" class="submit-btn img-sheet-share"><i class="fas fa-arrow-up-from-bracket"></i> 사진에 저장 / 공유</button>' : ''}
-      <a class="submit-btn outline-btn img-sheet-dl" download="${filename}" href="${url}"><i class="fas fa-download"></i> 다운로드</a>
+      ${canShare ? `<button type="button" class="submit-btn img-sheet-share"><i class="fas fa-arrow-up-from-bracket"></i> 사진에 저장 (${n}장)</button>` : ''}
+      <button type="button" class="submit-btn outline-btn img-sheet-dl"><i class="fas fa-download"></i> 다운로드</button>
     </div>`;
-  sheet.querySelector('img').src = url;
-  const close = () => { sheet.remove(); document.body.classList.remove('no-scroll'); setTimeout(() => URL.revokeObjectURL(url), 60000); };
+  const close = () => { sheet.remove(); document.body.classList.remove('no-scroll'); setTimeout(() => urls.forEach(u => URL.revokeObjectURL(u)), 60000); };
   sheet.querySelector('.img-sheet-close').addEventListener('click', close);
   sheet.addEventListener('click', e => { if (e.target === sheet) close(); });
   const shareBtn = sheet.querySelector('.img-sheet-share');
   if (shareBtn) shareBtn.addEventListener('click', async () => {
-    try { await navigator.share({ files: [file], title: filename }); }
+    try { await navigator.share({ files }); }
     catch (e) { if (e && e.name !== 'AbortError') alert('공유 시트를 열지 못했습니다. 이미지를 길게 눌러 저장해 주세요.'); }
+  });
+  sheet.querySelector('.img-sheet-dl').addEventListener('click', async () => {
+    for (let i = 0; i < n; i++) {
+      const a = document.createElement('a');
+      a.href = urls[i]; a.download = names[i];
+      document.body.appendChild(a); a.click(); a.remove();
+      await new Promise(r => setTimeout(r, 350)); // 연속 다운로드 차단 회피
+    }
   });
   document.body.appendChild(sheet);
   document.body.classList.add('no-scroll');
 }
-async function saveAsImage(btn, filename, prepare) {
+
+async function saveAsImage(btn, base, prepare) {
   if (!window.html2canvas) { alert('이미지 저장 모듈을 불러오지 못했습니다. 인터넷 연결을 확인해 주세요.'); return; }
   const orig = btn.innerHTML;
   btn.innerHTML = '<i class="fas fa-spinner fa-spin"></i> 저장 중...';
   btn.disabled = true;
   const restore = prepare();
+  document.body.classList.add('capture-mode');
+  const scrollY = window.scrollY;
+  void document.querySelector('.glass-container').offsetWidth; // 레이아웃 즉시 반영
+  await new Promise(r => setTimeout(r, 30));
   try {
-    const blob = await renderImage(document.querySelector('.glass-container'));
+    const blobs = await renderPages(document.querySelector('.glass-container'));
+    document.body.classList.remove('capture-mode');
     restore();
-    showImageSheet(blob, filename);
+    window.scrollTo(0, scrollY);
+    showImageSheet(blobs, base);
   } catch (e) {
     console.error(e);
+    document.body.classList.remove('capture-mode');
     restore();
-    alert('이미지 저장에 실패했습니다. 화면이 너무 길면 탭을 하나씩 저장해 주세요.');
+    alert('이미지 저장에 실패했습니다.');
   } finally {
     btn.innerHTML = orig;
     btn.disabled = false;
@@ -375,8 +452,8 @@ async function saveAsImage(btn, filename, prepare) {
 const today = () => new Date().toISOString().slice(0, 10);
 
 document.getElementById('save-btn').addEventListener('click', () => {
-  saveAsImage(document.getElementById('save-btn'), `사주명식_${today()}.png`, () => {
-    // 모든 탭을 펼쳐 한 장으로
+  saveAsImage(document.getElementById('save-btn'), `사주명식_${today()}`, () => {
+    // 모든 탭을 펼쳐서 캡처
     const panels = [...document.querySelectorAll('.tab-panel')];
     const hiddenState = panels.map(p => p.classList.contains('hidden'));
     const tabs = document.querySelector('.tabs');
@@ -400,7 +477,7 @@ document.getElementById('couple-reset-btn').addEventListener('click', () => {
 });
 
 document.getElementById('couple-save-btn').addEventListener('click', () => {
-  saveAsImage(document.getElementById('couple-save-btn'), `궁합_${today()}.png`, () => {
+  saveAsImage(document.getElementById('couple-save-btn'), `궁합_${today()}`, () => {
     const btns = document.querySelector('#couple-result .result-btns');
     btns.style.display = 'none';
     return () => { btns.style.display = ''; };
