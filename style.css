@@ -481,12 +481,37 @@ h3.sub { font-size: .95rem; margin: 1.5rem 0 .8rem; opacity: .85; color: #fff; }
 
 /* ───────── 사진 업로드 ───────── */
 .upload-block { margin-bottom: 1.5rem; animation: fadeIn .4s ease; }
-.uploader { display: block; cursor: pointer; border: 1.5px dashed rgba(255,255,255,.25); border-radius: 12px; overflow: hidden; transition: all .2s; }
-.uploader:hover { border-color: var(--gold-accent); background: rgba(212,175,55,.04); }
-.up-placeholder { display: flex; flex-direction: column; align-items: center; justify-content: center; gap: .5rem; padding: 2.2rem 1rem; color: var(--text-secondary); }
-.up-placeholder i { font-size: 1.8rem; opacity: .6; }
-.up-placeholder span { font-size: .85rem; }
-.up-preview { width: 100%; max-height: 300px; object-fit: contain; display: block; background: #000; }
+.uploader { display: block; border: 1.5px dashed rgba(255,255,255,.25); border-radius: 12px; overflow: hidden; }
+.up-placeholder { display: flex; flex-direction: column; align-items: center; justify-content: center; gap: .9rem; padding: 1.8rem 1rem; color: var(--text-secondary); }
+.up-placeholder > i { font-size: 1.8rem; opacity: .6; }
+.up-btns { display: flex; flex-wrap: wrap; justify-content: center; gap: .6rem; }
+.up-btn { display: inline-flex; align-items: center; gap: .45rem; padding: .7rem 1.1rem; border-radius: 10px; border: 1px solid var(--gold-accent); background: var(--gold-accent); color: #14151a; font-size: .9rem; font-weight: 600; font-family: inherit; cursor: pointer; }
+.up-btn.ghost { background: transparent; color: var(--gold-accent); }
+.up-btn.small { padding: .45rem .8rem; font-size: .8rem; font-weight: 500; }
+.up-btn:hover { filter: brightness(1.1); }
+.up-stage { background: #000; text-align: center; line-height: 0; }
+.up-frame { position: relative; display: inline-block; max-width: 100%; }
+.up-preview { display: block; max-width: 100%; max-height: 460px; width: auto; height: auto; }
+.up-overlay { position: absolute; inset: 0; width: 100%; height: 100%; pointer-events: none; }
+.up-again { padding: .6rem; }
+.shot-tips { margin-top: .5rem; font-size: .8rem; color: var(--text-secondary); }
+.shot-tips summary { cursor: pointer; color: var(--gold-accent); opacity: .85; }
+.shot-tips ul { margin: .5rem 0 0 1.1rem; line-height: 1.65; }
+.shot-tips b { color: #e8e6df; }
+
+/* 웹캠 촬영 창 (PC) */
+.cam-modal { position: fixed; inset: 0; z-index: 1100; background: #05060a; display: flex; flex-direction: column; }
+.cam-top { display: flex; align-items: center; justify-content: space-between; gap: 1rem; padding: .8rem 1rem; color: #e8e6df; font-size: .9rem; }
+.cam-x { background: none; border: 0; color: #e8e6df; font-size: 1.4rem; cursor: pointer; padding: .2rem .5rem; }
+.cam-stage { position: relative; flex: 1; min-height: 0; display: flex; align-items: center; justify-content: center; }
+.cam-stage video { max-width: 100%; max-height: 100%; }
+.cam-stage video.mirror { transform: scaleX(-1); }
+.cam-guide { position: absolute; inset: 0; width: 100%; height: 100%; fill: none; stroke: rgba(241,201,68,.8); stroke-width: .5; pointer-events: none; }
+.cam-bar { display: flex; align-items: center; justify-content: space-between; padding: 1rem 2rem calc(1rem + env(safe-area-inset-bottom)); }
+.cam-shot { width: 68px; height: 68px; border-radius: 50%; border: 4px solid #fff; background: var(--gold-accent); cursor: pointer; }
+.cam-shot:active { transform: scale(.94); }
+.cam-flip, .cam-spacer { width: 44px; height: 44px; }
+.cam-flip { border-radius: 50%; border: 1px solid rgba(255,255,255,.4); background: transparent; color: #fff; font-size: 1.1rem; cursor: pointer; }
 
 /* ───────── 수상 손금 설문 ───────── */
 .palm-survey { margin-top: 1.3rem; padding-top: 1.3rem; border-top: 1px dashed var(--panel-border); display: flex; flex-direction: column; gap: 1.1rem; }
@@ -568,3 +593,53 @@ body.capture-mode .glass-container { width: 420px !important; max-width: 420px !
 .pdf-name { font-weight: 600; font-size: 1.05rem; word-break: break-all; }
 .pdf-meta { opacity: .65; margin-top: .3rem; font-size: .9rem; }
 .pdf-hint { margin-top: 1.2rem; font-size: .9rem; line-height: 1.6; opacity: .85; max-width: 320px; }
+
+/* ───────── 관상·수상 보강: 설문·풀이 카드 ───────── */
+.q-num { color: var(--gold-accent); font-weight: 700; }
+.survey-more { border: 1px solid var(--panel-border); border-radius: 10px; padding: .7rem .9rem; }
+.survey-more > summary { cursor: pointer; color: var(--gold-accent); font-size: .88rem; }
+.survey-more-body { display: flex; flex-direction: column; gap: 1.1rem; margin-top: 1rem; }
+.hand-auto-status { line-height: 1.6; }
+
+.h2-sub, .h3-sub { font-size: .72rem; font-weight: 400; opacity: .5; margin-left: .35rem; letter-spacing: .03em; }
+.yun-tag { float: right; font-size: .7rem; font-weight: 500; color: var(--gold-accent); border: 1px solid rgba(212,175,55,.4); border-radius: 12px; padding: .12rem .55rem; margin-top: .15rem; }
+.read-photo { margin: 0 0 1.1rem; text-align: center; }
+.read-photo img { width: 100%; max-width: 300px; max-height: 380px; object-fit: contain; border-radius: 10px; }
+.read-photo figcaption { font-size: .72rem; opacity: .5; margin-top: .4rem; line-height: 1.5; }
+.read-intro { font-size: .84rem; line-height: 1.7; color: #c9c9c9; background: rgba(255,255,255,.03); border-left: 2px solid rgba(212,175,55,.45); padding: .7rem .9rem; border-radius: 0 8px 8px 0; margin-bottom: 1.1rem; }
+.read-item { padding: .9rem 0; border-top: 1px solid var(--panel-border); }
+.read-item:first-of-type { border-top: 0; padding-top: .2rem; }
+.read-head { display: flex; flex-wrap: wrap; align-items: baseline; gap: .45rem; margin-bottom: .45rem; }
+.read-head b { color: var(--gold-accent); font-size: 1rem; }
+.read-head .deg { font-size: .68rem; padding: .08rem .45rem; border-radius: 10px; background: rgba(212,175,55,.16); color: var(--gold-hover); }
+.read-head .deg.alt { background: rgba(120,200,255,.14); color: #a8d8ff; }
+.read-area { margin-left: auto; font-size: .74rem; opacity: .5; }
+.read-item p { font-size: .9rem; line-height: 1.75; color: #e2e2e2; }
+.read-item p.read-note { font-size: .78rem; opacity: .6; margin-top: .4rem; }
+.read-normal { font-size: .78rem; line-height: 1.6; opacity: .62; margin-top: .8rem; }
+.read-normal b { margin-right: .4rem; color: #fff; }
+.read-none { font-size: .86rem; opacity: .7; }
+.read-warn { margin-top: 1rem; padding: .7rem .9rem; border-radius: 8px; background: rgba(255,170,60,.08); border: 1px solid rgba(255,170,60,.3); }
+.read-warn p { font-size: .82rem; line-height: 1.6; color: #f0c890; }
+.fgauge { display: flex; align-items: center; gap: .5rem; font-size: .68rem; color: var(--text-secondary); margin: .1rem 0 .55rem; }
+.fgauge span { flex: 0 0 auto; }
+.ftrack { position: relative; flex: 1; height: 4px; border-radius: 2px; background: linear-gradient(90deg, rgba(255,255,255,.14), rgba(255,255,255,.3) 38%, rgba(255,255,255,.3) 62%, rgba(255,255,255,.14)); }
+.ftrack::before { content: ''; position: absolute; left: 50%; top: -3px; width: 1px; height: 10px; background: rgba(255,255,255,.45); }
+.ftrack i { position: absolute; top: 50%; width: 11px; height: 11px; margin: -5.5px 0 0 -5.5px; border-radius: 50%; background: var(--gold-accent); box-shadow: 0 0 0 2px #14151a; }
+.hl-list, .dom-list { list-style: none; margin: 0; padding: 0; }
+.hl-list li { padding: .35rem 0; font-size: .9rem; }
+.hl-list li b { color: var(--gold-accent); }
+.hl-list li span, .dom-list li span { font-size: .72rem; opacity: .55; margin-left: .4rem; }
+.dom-list li { font-size: .88rem; line-height: 1.65; padding: .4rem 0; border-top: 1px solid var(--panel-border); color: #e2e2e2; }
+.dom-list li:first-child { border-top: 0; }
+.dom-list li span { display: block; margin: 0 0 .1rem; }
+.kv-table { width: 100%; border-collapse: collapse; font-size: .86rem; }
+.kv-table th { text-align: left; width: 5.2rem; padding: .45rem .5rem .45rem 0; color: var(--text-secondary); font-weight: 500; vertical-align: top; white-space: nowrap; }
+.kv-table td { padding: .45rem 0; line-height: 1.6; color: #e2e2e2; }
+.kv-table tr + tr th, .kv-table tr + tr td { border-top: 1px solid var(--panel-border); }
+.kv-table tr.now th, .kv-table tr.now td { color: var(--gold-accent); font-weight: 600; }
+.primer { border-top: 1px solid var(--panel-border); padding: .7rem 0; }
+.primer:first-of-type { border-top: 0; }
+.primer > summary { cursor: pointer; font-size: .9rem; color: #f0f0f0; }
+.primer > p { font-size: .86rem; line-height: 1.75; color: #cfcfcf; margin-top: .6rem; }
+.primer .kv-table { margin-top: .6rem; }

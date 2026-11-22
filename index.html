@@ -4,7 +4,7 @@
   <meta charset="UTF-8" />
   <meta name="viewport" content="width=device-width, initial-scale=1.0, viewport-fit=cover" />
   <title>전통 사주 명리 분석</title>
-  <link rel="stylesheet" href="style.css?v=18" />
+  <link rel="stylesheet" href="style.css?v=19" />
   <link rel="manifest" href="manifest.json" />
   <meta name="theme-color" content="#0b0c10" />
   <meta name="apple-mobile-web-app-capable" content="yes" />
@@ -129,22 +129,46 @@
 
       <!-- 관상: 얼굴 사진 -->
       <div class="upload-block hidden" id="face-block">
-        <label>👁️ 관상 — 얼굴 사진 <span class="hint">(정면 · 밝은 곳 · 이마가 머리카락에 가리지 않게)</span></label>
-        <label class="uploader" id="face-uploader">
+        <label>👁️ 관상 — 얼굴 사진 <span class="hint">(정면 · 밝은 곳 · 무표정)</span></label>
+        <div class="uploader" id="face-uploader">
           <input type="file" accept="image/*" id="face-file" hidden>
-          <div class="up-placeholder"><i class="fas fa-camera"></i><span>얼굴 사진 올리기</span></div>
-          <img class="up-preview hidden" id="face-preview" alt="얼굴 미리보기">
-        </label>
+          <input type="file" accept="image/*" capture="user" id="face-cam" hidden>
+          <div class="up-placeholder">
+            <i class="fas fa-face-smile"></i>
+            <div class="up-btns">
+              <button type="button" class="up-btn" data-up="face" data-act="camera"><i class="fas fa-camera"></i> 카메라로 찍기</button>
+              <button type="button" class="up-btn ghost" data-up="face" data-act="album"><i class="fas fa-images"></i> 앨범에서 고르기</button>
+            </div>
+          </div>
+          <div class="up-stage hidden"><div class="up-frame"><img class="up-preview" id="face-preview" alt="얼굴 미리보기"><canvas class="up-overlay hidden" id="face-overlay"></canvas></div></div>
+          <div class="up-btns up-again hidden">
+            <button type="button" class="up-btn ghost small" data-up="face" data-act="camera"><i class="fas fa-camera"></i> 다시 찍기</button>
+            <button type="button" class="up-btn ghost small" data-up="face" data-act="album"><i class="fas fa-images"></i> 다른 사진</button>
+          </div>
+        </div>
+        <details class="shot-tips"><summary>잘 나오게 찍는 법</summary><ul><li>카메라를 <b>눈높이</b>에 두고 정면을 보세요. 위나 아래에서 찍으면 턱과 코의 비율이 달라집니다.</li><li><b>무표정</b>으로 입을 다무세요. 웃으면 입꼬리와 눈 크기가 다르게 재집니다.</li><li>창가처럼 <b>밝고 고른 빛</b>에서 찍으세요. 한쪽에만 그림자가 지면 좌우 균형이 틀어져 보입니다.</li><li>앞머리·안경·마스크는 치우고, 팔을 쭉 뻗어 <b>조금 멀리서</b> 찍으세요. 너무 가까우면 코가 크게 찍힙니다.</li></ul></details>
       </div>
 
       <!-- 수상: 손바닥 사진 -->
       <div class="upload-block hidden" id="palm-block">
-        <label>✋ 수상 — 손바닥 사진 <span class="hint">(주로 쓰는 손 · 손금 잘 보이게 활짝 펴서)</span></label>
-        <label class="uploader" id="palm-uploader">
+        <label>✋ 수상 — 손바닥 사진 <span class="hint">(주로 쓰는 손 · 손목까지 · 활짝 펴서)</span></label>
+        <div class="uploader" id="palm-uploader">
           <input type="file" accept="image/*" id="palm-file" hidden>
-          <div class="up-placeholder"><i class="fas fa-hand"></i><span>손바닥 사진 올리기</span></div>
-          <img class="up-preview hidden" id="palm-preview" alt="손바닥 미리보기">
-        </label>
+          <input type="file" accept="image/*" capture="environment" id="palm-cam" hidden>
+          <div class="up-placeholder">
+            <i class="fas fa-hand"></i>
+            <div class="up-btns">
+              <button type="button" class="up-btn" data-up="palm" data-act="camera"><i class="fas fa-camera"></i> 카메라로 찍기</button>
+              <button type="button" class="up-btn ghost" data-up="palm" data-act="album"><i class="fas fa-images"></i> 앨범에서 고르기</button>
+            </div>
+          </div>
+          <div class="up-stage hidden"><div class="up-frame"><img class="up-preview" id="palm-preview" alt="손바닥 미리보기"><canvas class="up-overlay hidden" id="palm-overlay"></canvas></div></div>
+          <div class="up-btns up-again hidden">
+            <button type="button" class="up-btn ghost small" data-up="palm" data-act="camera"><i class="fas fa-camera"></i> 다시 찍기</button>
+            <button type="button" class="up-btn ghost small" data-up="palm" data-act="album"><i class="fas fa-images"></i> 다른 사진</button>
+          </div>
+        </div>
+        <details class="shot-tips"><summary>잘 나오게 찍는 법</summary><ul><li>손가락을 자연스럽게 <b>활짝 펴고</b> 손목 주름까지 나오게 찍으세요.</li><li>카메라와 손바닥을 <b>평행</b>하게 두세요. 비스듬하면 손가락 길이 비율이 틀어집니다.</li><li>손금은 <b>옆에서 비치는 빛</b>(창가)에서 가장 또렷합니다. 플래시를 정면에서 터뜨리면 선이 날아갑니다.</li><li>손을 살짝 오므리면 가는 선이 더 잘 보입니다. 설문은 실제 손을 보면서 답해도 됩니다.</li></ul></details>
       </div>
 
       <button type="submit" class="submit-btn">분석하기 ✨</button>
@@ -200,7 +224,7 @@
 
   </main>
 
-  <script type="module" src="app.js?v=31"></script>
+  <script type="module" src="app.js?v=32"></script>
   <script>
     // 로컬 개발(localhost)에선 서비스워커를 등록하지 않아 캐시 꼬임을 방지
     if ('serviceWorker' in navigator && location.hostname !== 'localhost' && location.hostname !== '127.0.0.1') {

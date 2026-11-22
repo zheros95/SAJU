@@ -2,7 +2,7 @@
 // 사주·관상·수상을 하나의 오행으로 합치지 않는다. 각 체계의 결론과 근거를 나란히 놓고,
 // 비교 가능한 항목에만 일치·상충·판단 불가를 표시한다.
 // 상충을 '겉과 속의 차이'로 풀지 않는다 — 그렇게 하면 어떤 결과도 맞는 해석이 되기 때문.
-// 관상·수상의 오행은 이 앱의 대응표(서양 4원소 손유형 → 오행, 관인팔법 유형 → 오행)에서 나온 값이라
+// 관상의 오행은 얼굴 윤곽 비율로 추정한 오형(五形), 수상의 오행은 이 앱의 대응표(서양 4원소 손유형 → 오행)에서 나온 값이라
 // 사주와 같아도 독립된 세 체계의 교차검증이 아니다. 화면에도 그렇게 적는다.
 // AI 호출 없음. 규칙 기반.
 
@@ -57,9 +57,9 @@ export function readIntegration({ saju, face, palm, sajuProfile }) {
   if (face) {
     sources.push({
       name: '관상',
-      conclusion: face.topType ? `${face.topType} 유형 → 앱 대응표로 ${el(face.element)}` : '유형 미판정',
-      basis: `얼굴 기준점 비율 측정 ${(face.items || []).length}개 항목`,
-      limits: '측정 임계값은 검증되지 않은 초기 추정치. 각도·조명·표정에 따라 유형이 바뀔 수 있음. 형태 측정이 성격·능력 판단의 타당성을 뜻하지 않음.',
+      conclusion: face.topType ? `얼굴형 ${face.topType} → ${el(face.element)}` : '유형 미판정',
+      basis: `얼굴 메시 478점의 윤곽 비율로 오형(五形) 추정${face.shape && face.shape.byUser ? '(얼굴형은 직접 선택)' : ''} · 풀이 항목 ${(face.items || []).length}개`,
+      limits: '기준값은 정면 사진 60장의 작은 표본에서 얻은 것. 각도·표정에 따라 유형이 바뀔 수 있고, 현대 얼굴형과 고전 오형의 대응은 고전 근거가 약함. 형태 측정이 성격·능력 판단의 타당성을 뜻하지 않음.',
     });
   }
   if (palm) {
@@ -86,13 +86,13 @@ export function readIntegration({ saju, face, palm, sajuProfile }) {
   lines.push('세 체계를 한 오행으로 합치지 않고, 각 결론과 근거를 나란히 둡니다. 비교는 오행 값이 있는 쌍에만 하고 결과는 일치·상충·판단 불가 셋 중 하나입니다.');
   const agree = compare.filter(c => c.verdict === '일치').length, conflict = compare.filter(c => c.verdict === '상충').length, unknown = compare.filter(c => c.verdict === '판단 불가').length;
   if (compare.length) lines.push(`비교 ${compare.length}건 — 일치 ${agree} · 상충 ${conflict} · 판단 불가 ${unknown}.`);
-  if (agree) lines.push('일치는 관상·수상의 오행이 이 앱의 대응표에서 나온 값이라 <b>독립된 교차검증이 아닙니다</b>. 같은 방향을 가리킨다는 정도로만 보세요.');
+  if (agree) lines.push('일치는 관상의 오행이 윤곽 비율로 추정한 값이고 수상의 오행이 이 앱의 대응표에서 나온 값이라 <b>독립된 교차검증이 아닙니다</b>. 같은 방향을 가리킨다는 정도로만 보세요.');
   if (conflict) lines.push('상충은 "겉과 속이 다르다"로 풀지 않고 <b>판단을 보류</b>합니다. 그렇게 풀면 어떤 결과도 맞는 해석이 되기 때문입니다.');
 
   // ── 4) 주제별 정리 — 출처를 문장마다 표시, 세 체계를 하나로 묶는 문장은 쓰지 않음 ──
   const charBits = [];
   if (sajuProfile?.basic) charBits.push(`[사주] ${firstSent(sajuProfile.basic)}`);
-  if (face?.profile) charBits.push(`[관상] <b>${face.profile.character}</b> 인상으로 분류`);
+  if (face?.profile) charBits.push(`[관상] ${face.topType}의 통속 성격론으로는 <b>${face.profile.character}</b> 기질`);
   if (palm?.profile) charBits.push(`[수상] <b>${palm.profile.character}</b> 기질로 분류`);
   const characterText = charBits.join(' / ');
 

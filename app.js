@@ -1,8 +1,11 @@
 import { buildChart } from './saju_engine.mjs?v=14';
 import * as T from './saju_text.mjs?v=15';
 import { dayMasterDescriptions } from './saju_descriptions.mjs?v=10';
-import { PALM_QUESTIONS, readPalmistry, detectHandType } from './palmistry.mjs?v=8';
-import { readIntegration } from './integration.mjs?v=5';
+import { PALM_QUESTIONS, readPalmistry, detectHandType, palmGuide } from './palmistry.mjs?v=9';
+import { FACE_QUESTIONS, FACE_PRIMER, YUNYEON } from './physiognomy_text.mjs?v=1';
+import { PALM_PRIMER } from './palmistry_text.mjs?v=1';
+import { isMobileDevice, normalizeImage, openCameraModal } from './camera.mjs?v=1';
+import { readIntegration } from './integration.mjs?v=6';
 import { annotate, easySummaryCard } from './glossary.mjs?v=3';
 
 // ───────── 오행 색상 ─────────
@@ -98,54 +101,206 @@ function syncViewSections() {
   byId('face-block').classList.toggle('hidden', !v.includes('gwansang'));
   byId('palm-block').classList.toggle('hidden', !v.includes('susang'));
   if (v.includes('susang')) ensurePalmSurvey();
+  if (v.includes('gwansang')) ensureFaceSurvey();
 }
 document.querySelectorAll('input[name="view"]').forEach(c => c.addEventListener('change', syncViewSections));
 syncViewSections();
 
-// ── 수상 손금 설문 폼 (손 사진 아래 자동 생성) ──
-let _palmSurveyReady = false;
-function ensurePalmSurvey() {
-  if (_palmSurveyReady) return;
-  const html = `<div class="palm-survey">
-    <p class="mini-note">손 모양은 사진에서 <b>자동 판별</b>돼. 손금·문양은 사진을 보며 골라줘 — <b>'모르겠다'나 빈 항목은 '없다'로 보지 않고 판단 보류</b>로 처리해.</p>
-    <p id="hand-auto-status" class="hand-auto-status hidden"></p>
-    ${PALM_QUESTIONS.map(q => `
-      <div class="form-group palm-q" data-qid="${q.id}">
-        <label>${q.label} ${q.hint ? `<span class="hint">${q.hint}</span>` : ''}</label>
-        <div class="radio-col">
-          ${q.options.map(o => `<label class="palm-opt"><input type="radio" name="palm-${q.id}" value="${o.value}"> ${o.label}</label>`).join('')}
-        </div>
-      </div>`).join('')}
+// ── 설문 폼 (사진 아래 자동 생성) ──
+const CIRCLED = ['', '①', '②', '③', '④', '⑤', '⑥'];
+function questionHtml(q, prefix) {
+  return `<div class="form-group palm-q" data-qid="${q.id}">
+    <label>${q.n ? `<span class="q-num">${CIRCLED[q.n]}</span> ` : ''}${q.label} ${q.hint ? `<span class="hint">${q.hint}</span>` : ''}</label>
+    <div class="radio-col">
+      ${q.options.map(o => `<label class="palm-opt"><input type="radio" name="${prefix}-${q.id}" value="${o.value}"> ${o.label}</label>`).join('')}
+    </div>
   </div>`;
-  byId('palm-block').insertAdjacentHTML('beforeend', html);
-  _palmSurveyReady = true;
 }
-function readPalmAnswers() {
+function readAnswers(questions, prefix) {
   const a = {};
-  PALM_QUESTIONS.forEach(q => {
-    const sel = document.querySelector(`input[name="palm-${q.id}"]:checked`);
+  questions.forEach(q => {
+    const sel = document.querySelector(`input[name="${prefix}-${q.id}"]:checked`);
     if (sel) a[q.id] = sel.value;
   });
   return a;
 }
 
-// 사진 업로드 미리보기 (브라우저 내에서만 처리, 서버 전송 없음)
+let _palmSurveyReady = false;
+function ensurePalmSurvey() {
+  if (_palmSurveyReady) return;
+  const basic = PALM_QUESTIONS.filter(q => !q.more), more = PALM_QUESTIONS.filter(q => q.more);
+  const html = `<div class="palm-survey">
+    <p class="mini-note">손 모양과 손가락 길이는 사진에서 <b>자동으로 잽니다</b>. 손금은 사진이나 실제 손을 보며 골라 주세요. 번호(①~⑥)는 사진 위 안내선의 번호와 같습니다. <b>‘모르겠다’나 빈 항목은 ‘없다’로 보지 않고 판단 보류</b>로 처리합니다.</p>
+    <p id="hand-auto-status" class="hand-auto-status hidden"></p>
+    ${basic.map(q => questionHtml(q, 'palm')).join('')}
+    <details class="survey-more"><summary>더 자세히 보기 — 보조선·무늬·언덕 (선택, ${more.length}문항)</summary>
+      <div class="survey-more-body">${more.map(q => questionHtml(q, 'palm')).join('')}</div>
+    </details>
+  </div>`;
+  byId('palm-block').insertAdjacentHTML('beforeend', html);
+  _palmSurveyReady = true;
+}
+const readPalmAnswers = () => readAnswers(PALM_QUESTIONS, 'palm');
+
+let _faceSurveyReady = false;
+function ensureFaceSurvey() {
+  if (_faceSurveyReady) return;
+  const html = `<div class="palm-survey">
+    <p id="face-auto-status" class="hand-auto-status hidden"></p>
+    <details class="survey-more"><summary>사진으로 못 재는 부위 직접 고르기 — 이마·귀·코끝 등 (선택, ${FACE_QUESTIONS.length}문항)</summary>
+      <div class="survey-more-body">
+        <p class="mini-note">이마 머리선, 귀, 살집은 사진에서 잴 수 없습니다. 고른 항목만 풀이에 더하고, 비워 둔 항목은 풀이하지 않습니다.</p>
+        ${FACE_QUESTIONS.map(q => questionHtml(q, 'face')).join('')}
+      </div>
+    </details>
+  </div>`;
+  byId('face-block').insertAdjacentHTML('beforeend', html);
+  _faceSurveyReady = true;
+}
+const readFaceAnswers = () => readAnswers(FACE_QUESTIONS, 'face');
+
+// ───────── 사진 입력: 카메라 촬영 / 앨범 선택 (브라우저 내에서만 처리, 서버 전송 없음) ─────────
 const uploadedImages = {};
-function wireUploader(fileId, previewId, key) {
-  const file = byId(fileId), preview = byId(previewId);
-  file.addEventListener('change', () => {
-    const f = file.files[0];
-    if (!f) return;
-    uploadedImages[key] = f;
-    preview.src = URL.createObjectURL(f);
-    preview.classList.remove('hidden');
-    file.closest('.uploader').querySelector('.up-placeholder').classList.add('hidden');
+const photoHooks = {}; // key → 사진이 바뀔 때 실행할 함수
+async function setPhoto(key, file) {
+  if (!file) return;
+  const blob = await normalizeImage(file);
+  uploadedImages[key] = blob;
+  const box = byId(key + '-uploader'), preview = byId(key + '-preview');
+  if (preview.dataset.url) URL.revokeObjectURL(preview.dataset.url);
+  preview.dataset.url = preview.src = URL.createObjectURL(blob);
+  box.querySelector('.up-placeholder').classList.add('hidden');
+  box.querySelector('.up-stage').classList.remove('hidden');
+  box.querySelector('.up-again').classList.remove('hidden');
+  byId(key + '-overlay').classList.add('hidden');
+  if (photoHooks[key]) photoHooks[key]();
+}
+async function takePhoto(key) {
+  if (isMobileDevice()) { byId(key + '-cam').click(); return; } // 폰·태블릿: 기본 카메라 앱이 바로 열림
+  try {
+    const blob = await openCameraModal(key); // PC: 웹캠 창
+    if (blob) await setPhoto(key, blob);
+  } catch (e) {
+    console.error(e);
+    alert('카메라를 열지 못했습니다. 브라우저의 카메라 권한을 확인하거나 ‘앨범에서 고르기’로 사진 파일을 선택해 주세요.');
+  }
+}
+['face', 'palm'].forEach(key => {
+  ['file', 'cam'].forEach(sfx => byId(`${key}-${sfx}`).addEventListener('change', function () {
+    const f = this.files[0];
+    this.value = ''; // 같은 사진을 다시 골라도 change가 뜨게
+    setPhoto(key, f);
+  }));
+});
+document.querySelectorAll('.up-btn').forEach(btn => btn.addEventListener('click', () => {
+  const key = btn.dataset.up;
+  if (btn.dataset.act === 'camera') takePhoto(key);
+  else byId(key + '-file').click();
+}));
+
+// ── 사진 위 안내선 그리기 ──
+function waitImage(img) { // img.decode()는 간헐적으로 영원히 안 풀리는 버그가 있어 폴링으로 로드 대기
+  return new Promise((resolve, reject) => {
+    let n = 0;
+    const tick = () => {
+      if (img.complete && img.naturalWidth) return resolve();
+      if (++n > 80) return reject(new Error('이미지 로드 실패'));
+      setTimeout(tick, 100);
+    };
+    tick();
   });
 }
-wireUploader('face-file', 'face-preview', 'face');
-wireUploader('palm-file', 'palm-preview', 'palm');
+function overlayCtx(key) {
+  const img = byId(key + '-preview'), cv = byId(key + '-overlay');
+  cv.width = img.naturalWidth; cv.height = img.naturalHeight;
+  cv.classList.remove('hidden');
+  const ctx = cv.getContext('2d');
+  ctx.clearRect(0, 0, cv.width, cv.height);
+  return { ctx, W: cv.width, H: cv.height, u: Math.max(cv.width, cv.height) / 500 }; // u: 화면에서 약 1px에 해당하는 굵기 단위
+}
+function drawFaceOverlay(guide) {
+  const o = overlayCtx('face');
+  const { ctx, W, H } = o;
+  const fx = guide.closed[0].map(p => p[0] * W);
+  const u = Math.max(o.u * 0.5, (Math.max(...fx) - Math.min(...fx)) / 220); // 선 굵기는 얼굴 크기에 맞춘다
+  const path = (pts, close) => { ctx.beginPath(); pts.forEach(([x, y], i) => (i ? ctx.lineTo(x * W, y * H) : ctx.moveTo(x * W, y * H))); if (close) ctx.closePath(); ctx.stroke(); };
+  ctx.lineJoin = 'round';
+  ctx.strokeStyle = 'rgba(241,201,68,.9)'; ctx.lineWidth = 1.6 * u;
+  guide.closed.forEach(p => path(p, true));
+  ctx.strokeStyle = 'rgba(120,200,255,.95)'; ctx.lineWidth = 1.4 * u;
+  guide.open.forEach(p => path(p, false));
+  // 삼정 가로선
+  const xs = guide.closed[0].map(p => p[0]);
+  const x0 = Math.min(...xs) * W, x1 = Math.max(...xs) * W;
+  ctx.setLineDash([5 * u, 4 * u]); ctx.strokeStyle = 'rgba(255,255,255,.75)'; ctx.lineWidth = 1 * u;
+  guide.levels.forEach(y => { ctx.beginPath(); ctx.moveTo(x0, y * H); ctx.lineTo(x1, y * H); ctx.stroke(); });
+  ctx.setLineDash([]);
+}
+function drawPalmOverlay(guide, lm) {
+  const o = overlayCtx('palm');
+  const { ctx, W, H } = o;
+  // 글자·선 굵기는 사진 크기가 아니라 손 크기에 맞춘다(손이 작게 찍힌 사진에서 글자가 겹치지 않게)
+  const palmPx = Math.hypot((lm[9].x - lm[0].x) * W, (lm[9].y - lm[0].y) * H);
+  const u = Math.max(o.u * 0.45, Math.min(o.u * 1.6, palmPx / 150));
+  const label = (txt, x, y, bg, k = 1) => {
+    ctx.font = `600 ${11 * u * k}px sans-serif`;
+    const w = ctx.measureText(txt).width + 8 * u * k, h = 15 * u * k;
+    ctx.fillStyle = bg; ctx.beginPath();
+    if (ctx.roundRect) ctx.roundRect(x - w / 2, y - h / 2, w, h, h / 2); else ctx.rect(x - w / 2, y - h / 2, w, h);
+    ctx.fill();
+    ctx.fillStyle = '#14151a'; ctx.textAlign = 'center'; ctx.textBaseline = 'middle'; ctx.fillText(txt, x, y + 0.5 * u);
+  };
+  ctx.lineCap = 'round';
+  guide.curves.forEach(c => {
+    const [a, m, b] = c.pts.map(([x, y]) => [x * W, y * H]);
+    ctx.setLineDash([6 * u, 5 * u]);
+    ctx.strokeStyle = 'rgba(20,21,26,.55)'; ctx.lineWidth = 4 * u;
+    ctx.beginPath(); ctx.moveTo(a[0], a[1]); ctx.quadraticCurveTo(m[0], m[1], b[0], b[1]); ctx.stroke();
+    ctx.strokeStyle = 'rgba(241,201,68,.95)'; ctx.lineWidth = 2 * u;
+    ctx.beginPath(); ctx.moveTo(a[0], a[1]); ctx.quadraticCurveTo(m[0], m[1], b[0], b[1]); ctx.stroke();
+    ctx.setLineDash([]);
+    // 곡선의 가운데쯤에 번호
+    const t = 0.5, mx = (1 - t) * (1 - t) * a[0] + 2 * (1 - t) * t * m[0] + t * t * b[0], my = (1 - t) * (1 - t) * a[1] + 2 * (1 - t) * t * m[1] + t * t * b[1];
+    label(CIRCLED[c.n], mx, my, 'rgba(241,201,68,.97)');
+  });
+  guide.mounts.forEach(mt => label(mt.label, mt.at[0] * W, mt.at[1] * H, 'rgba(160,215,255,.72)', 0.8));
+}
 
-// 손 사진 올리면 손모양(4원소)을 MediaPipe로 자동 판별 → 설문 자동 선택
+// ── 얼굴 사진: 올리는 즉시 메시 인식 → 안내선·촬영 품질 안내 ──
+let faceDet = null, faceDetectPromise = null, faceApi = null;
+function setFaceStatus(html) {
+  const el = byId('face-auto-status');
+  if (el) { el.innerHTML = html; el.classList.remove('hidden'); }
+}
+photoHooks.face = () => {
+  ensureFaceSurvey();
+  faceDet = null;
+  setFaceStatus('🤖 얼굴 인식 중… (처음에는 모델을 내려받느라 조금 걸립니다)');
+  faceDetectPromise = (async () => {
+    const img = byId('face-preview');
+    try {
+      await waitImage(img);
+      faceApi = faceApi || await import('./physiognomy.mjs?v=3');
+      const det = await Promise.race([
+        faceApi.detectFace(img),
+        new Promise((_, rej) => setTimeout(() => rej(new Error('face-detect timeout')), 40000)),
+      ]);
+      if (!det) { setFaceStatus('🙂 사진에서 얼굴을 찾지 못했어요. 정면·밝은 곳에서 다시 찍어 주세요.'); return; }
+      faceDet = det;
+      drawFaceOverlay(faceApi.faceGuide(det));
+      const res = faceApi.readPhysiognomy(det);
+      if (!res.ok) { faceDet = null; setFaceStatus('⚠️ ' + res.reason); return; }
+      const shape = faceApi.autoShape(det);
+      const warn = res.warns.length ? `<br>⚠️ ${res.warns.join('<br>⚠️ ')}` : '';
+      setFaceStatus(`🤖 얼굴 인식 완료 — 추정 얼굴형 <b>${shape.weak ? '고른 형(계란형)' : shape.name}</b>. 노란 선이 윤곽, 파란 선이 눈썹·눈·코·입, 점선이 삼정 구분선입니다. 선이 얼굴과 어긋나 있으면 다시 찍어 주세요.${warn}`);
+    } catch (e) {
+      console.error(e);
+      setFaceStatus('얼굴 인식 모듈을 불러오지 못했어요. 인터넷 연결을 확인하고 사진을 다시 올려 주세요.');
+    }
+  })();
+};
+
+// ── 손 사진: 올리는 즉시 관절 인식 → 손모양·좌우 자동 선택, 손금 위치 안내선 ──
 const HAND_KO = { earth: '흙손', fire: '불손', air: '공기손', water: '물손' };
 function setHandAutoStatus(html) {
   const el = byId('hand-auto-status');
@@ -157,35 +312,34 @@ function setAutoQuestionsHidden(hidden) {
     document.querySelector(`.palm-q[data-qid="${qid}"]`)?.classList.toggle('hidden', hidden);
   });
 }
+let handAuto = null;
 let handDetectPromise = null; // 제출이 자동판별 완료를 기다리도록 추적 (경쟁상태 방지)
-byId('palm-file').addEventListener('change', () => {
+photoHooks.palm = () => {
   ensurePalmSurvey();
-  setHandAutoStatus('🤖 손모양 자동 분석 중…');
+  handAuto = null;
+  setHandAutoStatus('🤖 손 인식 중… (처음에는 모델을 내려받느라 조금 걸립니다)');
   handDetectPromise = (async () => {
     const img = byId('palm-preview');
     try {
-      // img.decode()는 간헐적으로 영원히 안 풀리는 버그가 있어 폴링으로 로드 대기
-      for (let i = 0; i < 50 && !(img.complete && img.naturalWidth); i++) {
-        await new Promise(res => setTimeout(res, 100));
-      }
-      if (!img.naturalWidth) throw new Error('이미지 로드 실패');
-      // 모델 로드가 막히면(느린 네트워크·GPU 문제) 20초 후 수동 선택으로 안내
+      await waitImage(img);
+      // 모델 로드가 막히면(느린 네트워크·GPU 문제) 수동 선택으로 안내
       const r = await Promise.race([
         detectHandType(img),
-        new Promise((_, rej) => setTimeout(() => rej(new Error('hand-detect timeout')), 20000)),
+        new Promise((_, rej) => setTimeout(() => rej(new Error('hand-detect timeout')), 30000)),
       ]);
       if (r && r.type) {
+        handAuto = r;
+        drawPalmOverlay(palmGuide(r.lm), r.lm);
         const radio = document.querySelector(`input[name="palm-handType"][value="${r.type}"]`);
         if (radio) radio.checked = true;
-        let sideTxt = '';
-        if (r.side) {
-          const sideRadio = document.querySelector(`input[name="palm-side"][value="${r.side}"]`);
-          if (sideRadio) sideRadio.checked = true;
-          sideTxt = `<b>${r.side === 'right' ? '오른손' : '왼손'}</b> · `;
-        }
+        const sideRadio = document.querySelector(`input[name="palm-side"][value="${r.side}"]`);
+        if (sideRadio) sideRadio.checked = true;
         // 자동 인식된 질문(좌우손·손모양)은 숨기고, 원하면 펼쳐서 고치게
         setAutoQuestionsHidden(true);
-        setHandAutoStatus(`🤖 자동 인식: ${sideTxt}<b>${HAND_KO[r.type]}</b> <button type="button" class="edit-auto-btn" id="edit-auto-btn">직접 고치기</button>`);
+        const notes = [];
+        if (r.border) notes.push('손 모양이 두 유형의 경계에 가깝습니다. 맞지 않으면 직접 고쳐 주세요.');
+        if (!r.reliable) notes.push('손가락이 굽었거나 겹쳐 보여 손가락 길이 풀이는 뺍니다. 손을 활짝 펴고 다시 찍으면 포함됩니다.');
+        setHandAutoStatus(`🤖 자동 인식: <b>${r.side === 'right' ? '오른손' : '왼손'}</b> · <b>${HAND_KO[r.type]}</b> <button type="button" class="edit-auto-btn" id="edit-auto-btn">직접 고치기</button><br>사진 위 점선은 손금이 <b>보통 지나는 자리</b>를 관절 위치로 어림한 안내선입니다. 실제 선을 인식한 것이 아니니, 그 근처에서 내 손금을 찾아 아래 문항을 골라 주세요.${notes.length ? '<br>⚠️ ' + notes.join('<br>⚠️ ') : ''}`);
         byId('edit-auto-btn')?.addEventListener('click', () => {
           setAutoQuestionsHidden(false);
           byId('edit-auto-btn').remove();
@@ -196,10 +350,11 @@ byId('palm-file').addEventListener('change', () => {
       }
     } catch (e) {
       console.error(e);
-      setHandAutoStatus('손모양 자동 판별은 건너뛰고, 아래에서 직접 골라 주세요.');
+      setAutoQuestionsHidden(false);
+      setHandAutoStatus('손 자동 인식은 건너뛰고, 아래에서 직접 골라 주세요.');
     }
   })();
-});
+};
 
 function readPerson(sfx) {
   const year = parseInt(byId('birth-year' + sfx).value, 10);
@@ -260,29 +415,29 @@ document.getElementById('saju-form').addEventListener('submit', async function (
       saju.input = p1;
     }
 
-    // ── 관상 (face-api, 동적 로드) ──
+    // ── 관상 (얼굴 메시 인식은 사진을 올릴 때 이미 시작됨) ──
     let face = null;
     if (views.includes('gwansang')) {
       setBusy('관상 분석 중…');
-      const { detectFace, readPhysiognomy } = await import('./physiognomy.mjs?v=2');
-      const pts = await Promise.race([
-        detectFace(byId('face-preview')),
-        new Promise((_, rej) => setTimeout(() => rej(new Error('얼굴 분석이 너무 오래 걸립니다. 인터넷 연결을 확인하고 다시 시도해 주세요.')), 25000)),
-      ]);
-      if (!pts) { clearBusy(); alert('사진에서 얼굴을 찾지 못했어요. 정면·밝은 곳에서 찍은 얼굴 사진으로 다시 시도해 주세요.'); return; }
-      face = readPhysiognomy(pts);
+      if (faceDetectPromise) await faceDetectPromise.catch(() => {});
+      if (!faceDet || !faceApi) { clearBusy(); alert(byId('face-auto-status')?.textContent?.trim() || '사진에서 얼굴을 찾지 못했어요. 정면·밝은 곳에서 찍은 얼굴 사진으로 다시 시도해 주세요.'); return; }
+      // 유년(나이별 부위)은 세는나이 기준 — 사주를 함께 볼 때만
+      const age = saju ? new Date().getFullYear() - saju.solar.year + 1 : null;
+      face = faceApi.readPhysiognomy(faceDet, { answers: readFaceAnswers(), age });
       if (!face.ok) { clearBusy(); alert(face.reason); return; }
+      face.photo = snapshotWithOverlay('face', faceDet.lm, 0.3);
     }
 
-    // ── 수상 (손금 설문 기반) ──
+    // ── 수상 (손 비율은 자동 측정, 손금은 설문) ──
     let palm = null;
     if (views.includes('susang')) {
-      // 손모양 자동판별이 진행 중이면 끝까지 대기 (내부에 20초 타임아웃이 있어 유한함)
+      // 손 자동 인식이 진행 중이면 끝까지 대기 (내부에 타임아웃이 있어 유한함)
       if (handDetectPromise) {
         setBusy('손 사진 분석 중…');
         await handDetectPromise.catch(() => {});
       }
-      palm = readPalmistry(readPalmAnswers());
+      palm = readPalmistry(readPalmAnswers(), handAuto);
+      palm.photo = snapshotWithOverlay('palm', handAuto && handAuto.lm, 0.15);
     }
 
     // ── 통합 교차통변 (2가지 이상 선택 시) ──
@@ -479,7 +634,12 @@ document.getElementById('save-btn').addEventListener('click', () => {
     panels.forEach(p => p.classList.remove('hidden'));
     tabs.style.display = 'none';
     btns.style.display = 'none';
+    // 접어 둔 해설도 PDF에는 펼쳐서 싣는다
+    const folds = [...document.querySelectorAll('#result-section details')];
+    const foldState = folds.map(d => d.open);
+    folds.forEach(d => { d.open = true; });
     return () => {
+      folds.forEach((d, i) => { d.open = foldState[i]; });
       panels.forEach((p, i) => { if (hiddenState[i]) p.classList.add('hidden'); });
       tabs.style.display = '';
       btns.style.display = '';
@@ -570,31 +730,111 @@ function renderResults({ saju, face, palm, integration }) {
   window.scrollTo({ top: 0, behavior: 'smooth' });
 }
 
+// ── 관상·수상 탭 공통 조각 ──
+// 사진과 안내선을 한 장으로 합쳐 결과 화면(과 PDF)에 싣는다. 브라우저 안에서만 만든다.
+function snapshotWithOverlay(key, pts, margin = 0.3) {
+  try {
+    const img = byId(key + '-preview'), ov = byId(key + '-overlay');
+    const W = img.naturalWidth, H = img.naturalHeight;
+    if (!W) return null;
+    // 인식된 점들의 둘레에 여백을 붙여 잘라 낸다(점이 없으면 사진 전체)
+    let x0 = 0, y0 = 0, x1 = W, y1 = H;
+    if (pts && pts.length) {
+      const xs = pts.map(q => q.x * W), ys = pts.map(q => q.y * H);
+      const bw = Math.max(...xs) - Math.min(...xs), bh = Math.max(...ys) - Math.min(...ys);
+      x0 = Math.max(0, Math.min(...xs) - bw * margin); x1 = Math.min(W, Math.max(...xs) + bw * margin);
+      y0 = Math.max(0, Math.min(...ys) - bh * margin); y1 = Math.min(H, Math.max(...ys) + bh * margin);
+    }
+    const cw = x1 - x0, ch = y1 - y0;
+    const s = Math.min(1, 720 / Math.max(cw, ch));
+    const cv = document.createElement('canvas');
+    cv.width = Math.round(cw * s); cv.height = Math.round(ch * s);
+    const ctx = cv.getContext('2d');
+    ctx.drawImage(img, x0, y0, cw, ch, 0, 0, cv.width, cv.height);
+    if (!ov.classList.contains('hidden') && ov.width) ctx.drawImage(ov, x0, y0, cw, ch, 0, 0, cv.width, cv.height);
+    return cv.toDataURL('image/jpeg', 0.85);
+  } catch (e) { console.warn(e); return null; }
+}
+const gaugeHtml = it => (it.pos == null ? '' : `<div class="fgauge"><span>${it.loWord}</span><div class="ftrack"><i style="left:${(it.pos * 100).toFixed(1)}%"></i></div><span>${it.hiWord}</span></div>`);
+const primerHtml = (title, list) => `<div class="card"><h2><i class="fas fa-book-open"></i> ${title}</h2>
+  ${list.map(p => `<details class="primer"><summary>${p.title}</summary><p>${p.body}</p></details>`).join('')}</div>`;
+const photoHtml = (src, cap) => (src ? `<figure class="read-photo"><img src="${src}" alt=""><figcaption>${cap}</figcaption></figure>` : '');
+
 // ── 관상 탭 렌더 ──
 function renderGwansangTab(face) {
+  const sh = face.shape;
   const head = `<div class="card">
     <h2><i class="fas fa-eye"></i> 관상 종합</h2>
+    ${photoHtml(face.photo, '노란 선은 윤곽, 파란 선은 눈썹·눈·코·입, 점선은 삼정 구분선(눈썹·코밑·턱끝)')}
     <div class="prose">${face.lines.map(l => `<p>${l}</p>`).join('')}</div>
     <div class="badges">
-      <span class="badge good"><i class="fas fa-user-tag"></i> ${face.topType}</span>
-      <span class="badge"><i class="fas fa-circle-half-stroke"></i> 오행 ${face.element}</span>
+      <span class="badge good"><i class="fas fa-user-tag"></i> ${sh.name}</span>
+      <span class="badge"><i class="fas fa-circle-half-stroke"></i> 오형 ${face.topType}</span>
     </div>
+    ${face.highlights.length ? `<h3 class="sub">두드러진 특징</h3><ul class="hl-list">${face.highlights.map(h => `<li><b>${h.head}</b> <span>${h.group}</span></li>`).join('')}</ul>` : ''}
+    ${face.warns.length ? `<div class="read-warn">${face.warns.map(w => `<p><i class="fas fa-triangle-exclamation"></i> ${w}</p>`).join('')}</div>` : ''}
   </div>`;
-  const parts = `<div class="card">
-    <h2><i class="fas fa-list-ul"></i> 부위별 풀이</h2>
-    <p class="mini-note">face-api 얼굴 68점 자동 측정 기반 · 정면 사진일수록 정확합니다. 이마(상정)는 사진에서 측정되지 않아 제외됩니다.</p>
-    <div class="sinsal-list">
-      ${face.items.map(it => `<div class="sinsal-chip"><b>${it.area}</b> <span>${it.cls}</span><p>${it.text}</p></div>`).join('')}
-    </div>
+
+  const pctRows = Object.entries(sh.pct).map(([k, v]) => `<div class="element-bar"><span class="label">${k}형</span><div class="bar-fill"><div class="fill ${ELEM_EN[k]}" data-w="${v}%"></div></div><span class="count">${v}%</span></div>`).join('');
+  const pf = face.profile;
+  const shape = `<div class="card">
+    <h2><i class="fas fa-shapes"></i> 얼굴형과 오형 <span class="h2-sub">五形</span></h2>
+    <div class="prose">${sh.lines.map(l => `<p>${l}</p>`).join('')}</div>
+    <h3 class="sub">윤곽 비율로 본 다섯 형의 가까운 정도</h3>
+    <div class="elements-chart">${pctRows}</div>
+    <p class="mini-note">얼굴 가로세로비, 하관 폭, 턱끝 폭, 턱 모서리 각으로 계산한 상대 점수입니다. 살집의 두께와 얼굴빛은 반영되지 않습니다.</p>
+    <h3 class="sub">${face.topType}의 기질 <span class="h3-sub">통속 성격론</span></h3>
+    <table class="kv-table">
+      <tr><th>기질</th><td>${pf.character}</td></tr>
+      <tr><th>강점</th><td>${pf.strength}</td></tr>
+      <tr><th>주의</th><td>${pf.caution}</td></tr>
+      <tr><th>맞는 일</th><td>${pf.aptitude}</td></tr>
+      <tr><th>관계</th><td>${pf.relation}</td></tr>
+    </table>
+    <p class="mini-note">고전 상서는 오형을 성격으로 길게 풀지 않고 형이 순수한지만 봤습니다. 이 표는 오행에 인·예·신·의·지를 붙인 데서 나온 요즘의 통속 성격론입니다.</p>
   </div>`;
-  const disc = `<p class="disclaimer">관상은 통계적으로 검증된 학문이 아니며, '잘 맞는다'는 느낌의 정체는 <b>바넘효과·확증편향</b>입니다. 자기성찰용 참고로만 보고, 외모로 자신이나 타인을 단정하지 마세요. 얼굴은 표정·마음가짐·노력으로 바뀝니다.</p>`;
-  return head + parts + disc;
+
+  const groups = face.groups.map(g => {
+    const feats = [...g.feats, ...g.survey].map(f => `<div class="read-item">
+        <div class="read-head"><b>${f.head}</b>${f.degree ? `<span class="deg">${f.degree}</span>` : ''}${f.survey ? '<span class="deg alt">직접 선택</span>' : ''}<span class="read-area">${f.label}</span></div>
+        ${gaugeHtml(f)}
+        <p>${f.text}</p>
+      </div>`).join('');
+    const normals = g.normals.length ? `<p class="read-normal"><b>평균 범위</b> ${g.normals.map(n => n.label).join(' · ')}</p>` : '';
+    const held = g.held.length ? `<p class="read-normal"><b>판정 보류</b> ${g.held.join(' · ')} — 표정의 영향이 커서 뺐습니다.</p>` : '';
+    return `<div class="card">
+      <h2>${g.title} <span class="h2-sub">${g.hanja}</span>${g.yun ? `<span class="yun-tag">유년 ${g.yun}</span>` : ''}</h2>
+      <p class="read-intro">${g.intro}</p>
+      ${feats || '<p class="read-none">이 부위에서 평균을 눈에 띄게 벗어난 항목은 없습니다.</p>'}
+      ${normals}${held}
+    </div>`;
+  }).join('');
+
+  const domains = face.domains.length ? `<div class="card">
+    <h2><i class="fas fa-layer-group"></i> 분야별로 모아 보기</h2>
+    <p class="read-intro">위 풀이를 분야별로 다시 묶었습니다. 같은 분야에 서로 다른 방향의 풀이가 함께 있으면 어느 한쪽으로 합치지 않고 그대로 둡니다.</p>
+    ${face.domains.map(d => `<h3 class="sub">${d.title}</h3><ul class="dom-list">${d.items.map(i => `<li><span>${i.src}</span>${i.text}</li>`).join('')}</ul>`).join('')}
+  </div>` : '';
+
+  const yun = face.yun ? `<div class="card">
+    <h2><i class="fas fa-hourglass-half"></i> 지금 나이의 자리 <span class="h2-sub">流年</span></h2>
+    <div class="prose"><p>세는나이 <b>${face.yun.age}세</b>에 옛 상서가 보는 자리는 <b>${face.yun.area}</b>입니다.${face.yun.group ? ` 위의 ‘${face.yun.group}’ 묶음이 지금 시기에 해당합니다.` : ' 이 자리는 사진으로 잴 수 없어 풀이가 없습니다.'}</p></div>
+    <details class="primer"><summary>나이별 자리 전체 보기</summary>
+      <table class="kv-table">${YUNYEON.map(r => `<tr${face.yun.age >= r[0] && face.yun.age <= r[1] ? ' class="now"' : ''}><th>${r[0] === r[1] ? r[0] : r[0] + '~' + r[1]}세</th><td>${r[2]}</td></tr>`).join('')}</table>
+    </details>
+    <p class="mini-note">《신상전편》 유년운기부위가의 세는나이 기준입니다. 사주에 입력한 생년으로 계산했습니다.</p>
+  </div>` : '';
+
+  const method = `<p class="mini-note">측정 방법: 얼굴 메시 478점의 3D 좌표로 고개 방향을 정면으로 돌려놓은 뒤 부위 간 비율을 잽니다. 기준값은 한국인 정면 사진 60장을 같은 방식으로 재서 얻은 평균과 편차이고, 표본이 작아 정밀한 통계는 아닙니다. 이마 머리선·귀·살집·얼굴빛·눈빛은 잴 수 없습니다.</p>`;
+  const disc = `<p class="disclaimer">관상은 검증된 학문이 아닙니다. 현대 연구가 확인한 것은 얼굴이 첫인상을 만든다는 데까지이고, ‘잘 맞는다’는 느낌은 <b>바넘효과·확증편향</b>에서 옵니다. 자기성찰용 참고로만 보고, 외모로 자신이나 타인을 단정하지 마세요.</p>`;
+  return head + shape + groups + domains + yun + primerHtml('관상을 읽는 틀', FACE_PRIMER) + method + disc;
 }
 
 // ── 수상 탭 렌더 ──
 function renderSusangTab(palm) {
   const head = `<div class="card">
     <h2><i class="fas fa-hand"></i> 수상 종합</h2>
+    ${photoHtml(palm.photo, '점선과 번호는 손금이 보통 지나는 자리를 어림한 안내선입니다(실제 선을 인식한 것이 아닙니다)')}
     <div class="prose">${palm.lines.map(l => `<p>${l}</p>`).join('')}</div>
     <div class="badges">
       ${palm.side ? `<span class="badge"><i class="fas fa-hand"></i> ${palm.side}</span>` : ''}
@@ -602,14 +842,18 @@ function renderSusangTab(palm) {
       ${palm.element ? `<span class="badge"><i class="fas fa-circle-half-stroke"></i> 오행 ${palm.element}</span>` : ''}
     </div>
   </div>`;
-  const parts = `<div class="card">
-    <h2><i class="fas fa-list-ul"></i> 손금·손모양 풀이</h2>
-    <div class="sinsal-list">
-      ${palm.items.map(it => `<div class="sinsal-chip"><b>${it.area}</b> <span>${it.cls}</span><p>${it.text}</p></div>`).join('')}
-    </div>
-  </div>`;
-  const disc = `<p class="disclaimer">수상은 통계적으로 검증된 학문이 아닙니다(주요 손금은 태아기에 형성됩니다). '잘 맞는다'는 느낌은 <b>바넘효과·확증편향</b>이니 자기성찰용 참고로만 보세요.</p>`;
-  return head + parts + disc;
+  const groups = (palm.groups || []).map(g => `<div class="card">
+      <h2>${g.n ? `<span class="q-num">${CIRCLED[g.n]}</span> ` : ''}${g.title} <span class="h2-sub">${g.hanja}</span></h2>
+      <p class="read-intro">${g.intro}</p>
+      ${g.items.map(it => `<div class="read-item">
+        <div class="read-head"><b>${it.cls}</b>${it.auto ? '<span class="deg alt">사진 측정</span>' : ''}<span class="read-area">${it.area}</span></div>
+        ${gaugeHtml(it)}
+        <p>${it.text}</p>
+        ${it.note ? `<p class="read-note">${it.note}</p>` : ''}
+      </div>`).join('')}
+    </div>`).join('');
+  const disc = `<p class="disclaimer">수상은 검증된 학문이 아닙니다. 손바닥의 주요 주름은 태아기에 생기고 평생 거의 변하지 않습니다. ‘잘 맞는다’는 느낌은 <b>바넘효과·확증편향</b>에서 오니 자기성찰용 참고로만 보세요.</p>`;
+  return head + groups + primerHtml('손금을 읽는 틀', PALM_PRIMER) + disc;
 }
 
 // ── 통합 교차통변 탭 렌더 ──

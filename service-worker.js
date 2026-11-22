@@ -1,6 +1,6 @@
 // 오프라인 캐싱용 서비스 워커
 // 코드를 수정하면 CACHE 버전을 올려야 사용자에게 새 버전이 반영됩니다.
-const CACHE = 'saju-v23';
+const CACHE = 'saju-v24';
 const ASSETS = [
   './',
   './index.html',
@@ -12,15 +12,22 @@ const ASSETS = [
   './manseryeok.mjs',
   './solar_terms.mjs',
   './physiognomy.mjs',
+  './physiognomy_text.mjs',
+  './face_measure.mjs',
   './palmistry.mjs',
+  './palmistry_text.mjs',
+  './vision.mjs',
+  './camera.mjs',
+  './judgments.mjs',
+  './vsop87d_earth.mjs',
   './integration.mjs',
   './glossary.mjs',
   './manifest.json',
   './icon-192.png',
   './icon-512.png',
 ];
-// 참고: 관상(face-api) 라이브러리·모델은 외부 CDN이라 캐시 대상이 아닙니다.
-//       사주·수상은 완전 오프라인 동작, 관상 최초 1회만 인터넷이 필요합니다.
+// 참고: 얼굴·손 인식 라이브러리와 모델(MediaPipe)은 외부 CDN이라 캐시 대상이 아닙니다.
+//       사주는 완전 오프라인 동작, 관상·수상의 사진 인식은 인터넷이 필요합니다.
 
 self.addEventListener('install', (e) => {
   e.waitUntil(caches.open(CACHE).then((c) => c.addAll(ASSETS)).catch(() => {}));
